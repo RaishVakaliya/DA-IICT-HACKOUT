@@ -196,6 +196,7 @@ export const retire = mutation({
       await ctx.db.patch(credit._id, {
         status: "retired",
         retirementDate: Date.now(),
+        source: credit.source, // Include existing source to satisfy schema
       });
     }
 
@@ -256,11 +257,10 @@ export const requestStripePayout = mutation({
 export const requestWithdrawal = mutation({
   args: {
     amount: v.number(),
-    method: v.union(v.literal("upi"), v.literal("credit_card")),
+    method: v.union(v.literal("upi"), v.literal("stripe")),
     details: v.object({
       upiId: v.optional(v.string()),
-      cardholderName: v.optional(v.string()),
-      cardNumber: v.optional(v.string()),
+      stripeAccountId: v.optional(v.string()),
     }),
   },
   handler: async (ctx, { amount, method, details }) => {

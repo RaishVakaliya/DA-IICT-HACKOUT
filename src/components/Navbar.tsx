@@ -45,8 +45,7 @@ const Navbar = () => {
     { name: "Registry", path: "/registry" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Certification", path: "/certification" },
-    { name: "Hydcoin", path: "/purchase" },
-    { name: "Withdraw", path: "/withdraw" },
+    { name: "Wallet", path: "/wallet" },
     { name: "About", path: "/about" },
   ];
 

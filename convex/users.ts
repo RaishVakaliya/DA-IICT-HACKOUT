@@ -2,6 +2,7 @@ import {
   mutation,
   query,
   internalMutation,
+  internalQuery,
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
@@ -202,5 +203,25 @@ export const processWithdrawal = internalMutation({
     for (const creditId of request.creditIds) {
       await ctx.db.patch(creditId, { status: newStatus });
     }
+  },
+});
+
+export const getMyUser = internalQuery({
+  args: {},
+  async handler(ctx) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return user;
   },
 });

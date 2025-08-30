@@ -9,88 +9,68 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CheckCircle, Clock, XCircle, Loader2, Banknote, Landmark } from "lucide-react";
 
+// Purchase Component
+const PurchaseTab = () => {
+  const [credits, setCredits] = useState(10);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const pay = useAction(api.stripe.pay);
+
+  const handlePurchase = async () => {
+    setIsPurchasing(true);
+    try {
+      const url = await pay({ credits });
+      if (url) window.location.href = url;
+    } catch (error) {
+      console.error("Purchase failed:", error);
+      alert("There was an error with your purchase.");
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
+  return (
+    <Card className="shadow-lg mt-6 border-0">
+      <CardHeader>
+        <CardTitle className="text-2xl">New Purchase</CardTitle>
+        <CardDescription>1 Hydcoin = 83 INR</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="credits" className="font-semibold">Number of Credits (H)</Label>
+            <Input
+              id="credits"
+              type="number"
+              min="1"
+              value={credits}
+              onChange={(e) => setCredits(Math.max(1, Number(e.target.value)))}
+              className="mt-1 text-lg"
+              placeholder="e.g., 100"
+            />
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Total Cost</p>
+            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{(credits * 83).toFixed(2)}</p>
+          </div>
+          <Button
+            onClick={handlePurchase}
+            disabled={isPurchasing}
+            className="w-full text-lg py-6 bg-emerald-600 hover:bg-emerald-700"
+          >
+            {isPurchasing ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...</> : "Proceed to Checkout"}
+          </Button>
+          <p className="text-xs text-center text-gray-500 dark:text-gray-400">You will be redirected to Stripe to complete your purchase securely.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Withdrawal Components
 const StatusInfo: Record<string, { icon: React.ElementType, color: string, text: string }> = {
   pending: { icon: Clock, color: "text-yellow-500", text: "Pending" },
   processed: { icon: CheckCircle, color: "text-green-500", text: "Processed" },
   failed: { icon: XCircle, color: "text-red-500", text: "Failed" },
-};
-
-const WithdrawPage = () => {
-  const [activeTab, setActiveTab] = useState("withdraw");
-  const balance = useQuery(api.hydcoin.getBalance);
-  const currentUser = useQuery(api.users.getCurrentUser);
-  const createStripeAccountLink = useAction(api.stripe.createStripeAccountLink);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (!currentUser.stripeAccountId) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-24">
-        <div className="container mx-auto px-4 py-10 max-w-2xl">
-          <Card className="shadow-xl border-0">
-            <CardHeader className="text-center">
-              <Landmark className="mx-auto h-12 w-12 text-blue-500" />
-              <CardTitle className="text-2xl mt-4">Connect Your Bank Account</CardTitle>
-              <CardDescription className="mt-2">To withdraw funds, you need to connect your bank account via Stripe. This is a secure, one-time setup process.</CardDescription>
-            </CardHeader>
-            <CardContent className="text-center pb-8">
-              <Button onClick={async () => {
-                setIsLoading(true);
-                try {
-                  const url = await createStripeAccountLink();
-                  if (url) window.location.href = url;
-                } catch (err: any) {
-                  setError(err.message || "Failed to connect to Stripe.");
-                } finally {
-                  setIsLoading(false);
-                }
-              }} disabled={isLoading} size="lg" className="w-full max-w-sm mx-auto text-base">
-                {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Connecting...</> : "Connect with Stripe"}
-              </Button>
-              {error && <p className="text-red-500 text-sm font-medium text-center mt-4">{error}</p>}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-24">
-      <div className="container mx-auto px-4 py-10 max-w-4xl">
-        <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-800 dark:text-white">Withdraw Funds</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 mt-2">Securely cash out your Hydcoin credits.</p>
-        </header>
-
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center mb-8 border border-blue-200 dark:border-blue-800 shadow-sm">
-          <p className="text-sm text-blue-600 dark:text-blue-300 font-medium">Available Balance</p>
-          <p className="text-4xl font-bold text-blue-800 dark:text-blue-100 tracking-tight">{balance?.toFixed(2) ?? "0.00"} H</p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="withdraw">New Withdrawal</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
-          <TabsContent value="withdraw">
-            <WithdrawalForm />
-          </TabsContent>
-          <TabsContent value="history">
-            <WithdrawalHistory />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
 };
 
 const WithdrawalForm = () => {
@@ -261,5 +241,98 @@ const WithdrawalHistory = () => {
   );
 };
 
-export default WithdrawPage;
+const WithdrawTab = () => {
+  const [activeTab, setActiveTab] = useState("withdraw");
+  const currentUser = useQuery(api.users.getCurrentUser);
+  const createStripeAccountLink = useAction(api.stripe.createStripeAccountLink);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  if (currentUser === undefined) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-12 w-12 animate-spin text-gray-500" />
+      </div>
+    );
+  }
+
+  if (!currentUser?.stripeAccountId) {
+    return (
+      <Card className="shadow-xl border-0 mt-6">
+        <CardHeader className="text-center">
+          <Landmark className="mx-auto h-12 w-12 text-blue-500" />
+          <CardTitle className="text-2xl mt-4">Connect Your Bank Account</CardTitle>
+          <CardDescription className="mt-2">To withdraw funds, you need to connect your bank account via Stripe. This is a secure, one-time setup process.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center pb-8">
+          <Button onClick={async () => {
+            setIsLoading(true);
+            try {
+              const url = await createStripeAccountLink();
+              if (url) window.location.href = url;
+            } catch (err: any) {
+              setError(err.message || "Failed to connect to Stripe.");
+            } finally {
+              setIsLoading(false);
+            }
+          }} disabled={isLoading} size="lg" className="w-full max-w-sm mx-auto text-base">
+            {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Connecting...</> : "Connect with Stripe"}
+          </Button>
+          {error && <p className="text-red-500 text-sm font-medium text-center mt-4">{error}</p>}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-6">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="withdraw">New Withdrawal</TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
+      </TabsList>
+      <TabsContent value="withdraw">
+        <WithdrawalForm />
+      </TabsContent>
+      <TabsContent value="history">
+        <WithdrawalHistory />
+      </TabsContent>
+    </Tabs>
+  );
+};
+
+
+// Main Wallet Page
+const WalletPage = () => {
+  const balance = useQuery(api.hydcoin.getBalance);
+
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 pt-24">
+      <div className="container mx-auto px-4 py-10 max-w-4xl">
+        <header className="text-center mb-8">
+          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">Wallet</h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 mt-3">Manage your Hydcoin credits and transactions.</p>
+        </header>
+
+        <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center mb-10 border border-blue-200 dark:border-blue-800 shadow-sm">
+          <p className="text-md text-blue-600 dark:text-blue-300 font-medium">Available Balance</p>
+          <p className="text-5xl font-bold text-blue-800 dark:text-blue-100 tracking-tight">{balance?.toFixed(2) ?? "0.00"} H</p>
+        </div>
+
+        <Tabs defaultValue="purchase" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="purchase">Purchase</TabsTrigger>
+            <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+          </TabsList>
+          <TabsContent value="purchase">
+            <PurchaseTab />
+          </TabsContent>
+          <TabsContent value="withdraw">
+            <WithdrawTab />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default WalletPage;

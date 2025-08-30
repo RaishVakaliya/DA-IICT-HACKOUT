@@ -1,42 +1,39 @@
 import { v } from "convex/values";
 import Stripe from "stripe";
 import { action, internalAction, internalMutation } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
-async function getUser(ctx: any) {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-        throw new Error("Not authenticated");
-    }
-    const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
-        .unique();
-    if (!user) {
-        throw new Error("User not found");
-    }
-    return user;
-}
-
+/**
+ * Create a Stripe checkout session for the user to purchase Hydcoin credits.
+ * 
+ * @param credits The number of Hydcoin credits to purchase.
+ * @returns The URL of the Stripe checkout session.
+ */
 export const pay = action({
     args: { credits: v.number() },
-    handler: async (ctx, { credits }) => {
-        const user = await getUser(ctx);
+    handler: async (ctx, { credits }): Promise<string | null> => {
+        const user: Doc<"users"> | null = await ctx.runQuery(internal.users.getMyUser, {});
+        if (!user) {
+            throw new Error("User not found");
+        }
         const stripe = new Stripe(process.env.STRIPE_KEY!, {
-            apiVersion: "2025-08-27.basil",
+            apiVersion: "2024-06-20",
         });
 
         const domain = process.env.HOSTING_URL ?? "http://localhost:5173";
 
-        const session = await stripe.checkout.sessions.create({
+                const session = await stripe.checkout.sessions.create({
+            customer: user.stripeCustomerId,
+            automatic_payment_methods: { enabled: true },
             line_items: [
                 {
                     price_data: {
-                        currency: "usd",
+                        currency: "inr",
                         product_data: {
                             name: `${credits} Hydcoin Credits`,
                         },
-                        unit_amount: credits * 100, // Amount in cents
+                        unit_amount: credits * 83 * 100, // 1 credit = 83 INR, amount in paise
                     },
                     quantity: 1,
                 },
@@ -54,13 +51,23 @@ export const pay = action({
     },
 });
 
+/**
+ * If you don’t need a marketplace and only want to take payments (like normal checkout),
+ * you shouldn’t be calling createStripeAccountLink.
+ * Instead, use:
+ *  - stripe.checkout.sessions.create(...) for one-time purchases.
+ *  - stripe.subscriptions.create(...) for subscriptions.
+ */
 export const createStripeAccountLink = action({
     args: {},
     handler: async (ctx) => {
-        const user = await getUser(ctx);
+        const user: Doc<"users"> | null = await ctx.runQuery(internal.users.getMyUser, {});
+        if (!user) {
+            throw new Error("User not found");
+        }
 
         const stripe = new Stripe(process.env.STRIPE_KEY!, {
-            apiVersion: "2025-08-27.basil",
+            apiVersion: "2024-06-20",
         });
 
         const domain = process.env.HOSTING_URL ?? "http://localhost:5173";
@@ -111,13 +118,11 @@ export const processPayout = internalAction({
       throw new Error("User does not have a Stripe account connected.");
     }
 
-    const stripe = new Stripe(process.env.STRIPE_KEY!, {
-      apiVersion: "2025-08-27.basil",
-    });
+    const stripe = new Stripe(process.env.STRIPE_KEY!);
 
     const transfer = await stripe.transfers.create({
-      amount: withdrawal.amount * 100, // Amount in cents
-      currency: "usd",
+      amount: withdrawal.amount * 83 * 100, // Amount in paise (1 credit = 83 INR)
+      currency: "inr", // set currency to 'inr' for UPI payments
       destination: withdrawal.user.stripeAccountId,
       transfer_group: `withdrawal_${withdrawalId}`,
     });

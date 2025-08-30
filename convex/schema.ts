@@ -53,7 +53,7 @@ export default defineSchema({
       v.literal("pending_withdrawal"),
       v.literal("withdrawn")
     ),
-    source: v.union(
+    source: v.optional(v.union(
       v.object({
         type: v.literal("purchase"),
         purchaseId: v.id("purchases"),
@@ -62,7 +62,6 @@ export default defineSchema({
         type: v.literal("generation"),
         producerId: v.id("users"),
         certifierId: v.optional(v.id("users")),
-        issueDate: v.number(),
         certificationDate: v.optional(v.number()),
         metadata: v.optional(v.object({
           productionBatchId: v.string(),
@@ -70,7 +69,8 @@ export default defineSchema({
           productionDate: v.number(),
         })),
       })
-    ),
+    )),
+    issueDate: v.optional(v.number()), // Timestamp of issuance
     retirementDate: v.optional(v.number()), // Timestamp of retirement
   }).index("by_ownerId", ["ownerId"]),
 

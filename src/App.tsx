@@ -7,9 +7,8 @@ import ProfilePage from "./pages/ProfilePage";
 import MarketplacePage from "./pages/MarketplacePage";
 import CertificationPage from "./pages/CertificationPage";
 import AboutPage from "./pages/AboutPage";
-import PurchasePage from "./pages/PurchasePage";
 import RetirePage from "./pages/RetirePage";
-import WithdrawPage from "./pages/WithdrawPage";
+import WalletPage from "./pages/WalletPage";
 import AdminPage from "./pages/AdminPage";
 import Footer from "./components/Footer";
 import Registry from "./pages/Registry";
@@ -27,9 +26,8 @@ function App() {
             <Route path="/certification" element={<CertificationPage />} />
             <Route path="/registry" element={<Registry />} />
             <Route path="/about" element={<AboutPage />} />
-            <Route path="/purchase" element={<PurchasePage />} />
-              <Route path="/retire" element={<RetirePage />} />
-              <Route path="/withdraw" element={<WithdrawPage />} />
+            <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/retire" element={<RetirePage />} />
               <Route path="/admin" element={<AdminPage />} />
 
             {/* Catch all other routes and redirect to home */}
