@@ -239,6 +239,23 @@ export const getMyUser = internalQuery({
   },
 });
 
+export const getPendingProducerApplications = query({
+  handler: async (ctx) => {
+    // Only allow administrators to call this query
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can view pending applications.");
+    }
+
+    const pendingApplications = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("producerApplicationStatus"), "pending"))
+      .collect();
+
+    return pendingApplications;
+  },
+});
+
 export const setStripeCustomerId = internalMutation({
     args: { userId: v.id("users"), stripeCustomerId: v.string() },
     handler: async (ctx, { userId, stripeCustomerId }) => {
@@ -246,4 +263,87 @@ export const setStripeCustomerId = internalMutation({
             stripeCustomerId: stripeCustomerId,
         });
     },
+});
+
+export const submitProducerApplication = mutation({
+  args: {
+    producerDetails: v.object({
+      companyName: v.string(),
+      registrationNumber: v.string(),
+      businessAddress: v.string(),
+      contactPerson: v.string(),
+      website: v.optional(v.string()),
+    }),
+    documents: v.array(v.object({
+      type: v.string(),
+      url: v.string(),
+      uploadDate: v.number(),
+    })),
+  },
+  handler: async (ctx, { producerDetails, documents }) => {
+    const currentUser = await getAuthenticatedUser(ctx);
+
+    // Ensure the user hasn't already applied or is not already a producer
+    if (currentUser.producerApplicationStatus && currentUser.producerApplicationStatus !== "not_applied") {
+      throw new Error("Producer application already submitted or user is already a producer.");
+    }
+
+    const newDocuments = documents.map(doc => ({
+      ...doc,
+      status: "pending", // Initial status for new documents
+    }));
+
+    await ctx.db.patch(currentUser._id, {
+      producerApplicationStatus: "pending",
+      producerDetails,
+      documents: newDocuments,
+    });
+
+    return { success: true, message: "Producer application submitted successfully." };
+  },
+});
+
+export const updateDocumentStatus = internalMutation({
+  args: {
+    userId: v.id("users"),
+    documentIndex: v.number(),
+    status: v.union(v.literal("verified"), v.literal("rejected")),
+  },
+  handler: async (ctx, { userId, documentIndex, status }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found.");
+    if (!user.documents) throw new Error("User has no documents.");
+
+    const updatedDocuments = [...user.documents];
+    if (documentIndex < 0 || documentIndex >= updatedDocuments.length) {
+      throw new Error("Document index out of bounds.");
+    }
+
+    updatedDocuments[documentIndex].status = status;
+
+    await ctx.db.patch(userId, { documents: updatedDocuments });
+
+    return { success: true, message: "Document status updated." };
+  },
+});
+
+export const updateProducerApplicationStatus = internalMutation({
+  args: {
+    userId: v.id("users"),
+    status: v.union(v.literal("approved"), v.literal("rejected")),
+  },
+  handler: async (ctx, { userId, status }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found.");
+
+    // If approved, set role to producer
+    const updateData: Partial<Doc<"users">> = { producerApplicationStatus: status };
+    if (status === "approved") {
+      updateData.role = "producer";
+    }
+
+    await ctx.db.patch(userId, updateData);
+
+    return { success: true, message: `Producer application ${status}.` };
+  },
 });

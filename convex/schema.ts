@@ -26,6 +26,25 @@ export default defineSchema({
     searchable: v.optional(v.boolean()), // whether user can be searched
     stripeAccountId: v.optional(v.string()), // For Stripe Connect payouts
     stripeCustomerId: v.optional(v.string()), // For Stripe Checkout
+    producerApplicationStatus: v.optional(v.union(
+      v.literal("not_applied"),
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    )),
+    producerDetails: v.optional(v.object({
+      companyName: v.string(),
+      registrationNumber: v.string(),
+      businessAddress: v.string(),
+      contactPerson: v.string(),
+      website: v.optional(v.string()),
+    })),
+    documents: v.optional(v.array(v.object({
+      type: v.string(),
+      url: v.string(), // URL to the uploaded document
+      uploadDate: v.number(),
+      status: v.union(v.literal("pending"), v.literal("verified"), v.literal("rejected")),
+    }))),
   }).index("by_clerk_id", ["clerkId"]),
 
 
