@@ -1,6 +1,8 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import Stripe from "stripe";
 import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Webhook } from "svix";
 
 const http = httpRouter();
@@ -79,6 +81,80 @@ http.route({
     }
 
     return new Response("Webhook processed successfully", { status: 200 });
+  }),
+});
+
+// Stripe Webhook
+const handleStripeWebhook = httpAction(async (ctx, request) => {
+  const signature = request.headers.get("stripe-signature") as string;
+  const stripe = new Stripe(process.env.STRIPE_KEY!, { apiVersion: "2025-08-27.basil" });
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      await request.text(),
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    console.error(err);
+    return new Response("Webhook Error", { status: 400 });
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (!session.metadata?.userId || !session.metadata?.credits) {
+        return new Response("Missing metadata", { status: 400 });
+    }
+
+    await ctx.runMutation(internal.stripe.fulfill, {
+      stripeId: session.id,
+      userId: session.metadata.userId as any,
+      credits: parseInt(session.metadata.credits),
+    });
+  }
+
+  return new Response(null, { status: 200 });
+});
+
+http.route({
+  path: "/stripe-webhook",
+  method: "POST",
+  handler: handleStripeWebhook,
+});
+
+// Helper to check for admin privileges
+async function isAdmin(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return false;
+  // This ADMIN_CLERK_ID should be set in the Convex dashboard environment variables
+  const adminClerkId = process.env.ADMIN_CLERK_ID;
+  if (!adminClerkId) {
+    console.error("ADMIN_CLERK_ID environment variable not set.");
+    return false;
+  }
+  return identity.subject === adminClerkId;
+}
+
+// HTTP action to process a Stripe payout (admin only)
+http.route({
+  path: "/processStripePayout",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!(await isAdmin(ctx))) {
+      return new Response("Unauthorized", { status: 403 });
+    }
+
+    const { withdrawalId } = await request.json();
+    if (!withdrawalId) return new Response("Missing withdrawalId", { status: 400 });
+
+    try {
+      await ctx.runAction(internal.stripe.processPayout, { withdrawalId: withdrawalId as any });
+      return new Response("Payout processing started", { status: 200 });
+    } catch (error: any) {
+      console.error("Error processing payout:", error);
+      return new Response(error.message || "Failed to process payout", { status: 500 });
+    }
   }),
 });
 

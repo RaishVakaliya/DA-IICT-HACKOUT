@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { SignInButton } from "@clerk/clerk-react";
-import { Authenticated, Unauthenticated, useConvexAuth } from "convex/react";
+import { Authenticated, Unauthenticated, useConvexAuth, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useUser } from "../context/UserContext";
 
 // Custom RotateLoader component
@@ -36,12 +37,16 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user: currentUser } = useUser();
   const { isLoading } = useConvexAuth();
+  const balance = useQuery(api.hydcoin.getBalance);
+  const isAdmin = useQuery(api.users.isAdminUser);
   const location = useLocation();
 
   const navItems = [
     { name: "Registry", path: "/registry" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Certification", path: "/certification" },
+    { name: "Hydcoin", path: "/purchase" },
+    { name: "Withdraw", path: "/withdraw" },
     { name: "About", path: "/about" },
   ];
 
@@ -85,14 +90,27 @@ const Navbar = () => {
                   }`}
                 >
                   {item.name}
-                  {/* Active indicator */}
                   {isActivePath(item.path) && (
                     <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full"></div>
                   )}
-                  {/* Hover effect */}
                   <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 opacity-0 hover:opacity-100 transition-opacity duration-300 -z-10"></div>
                 </Link>
               ))}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className={`relative px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
+                    isActivePath("/admin")
+                      ? "bg-white text-red-600 shadow-md border border-red-100"
+                      : "text-gray-600 hover:text-red-600 hover:bg-white/80"
+                  }`}
+                >
+                  Admin
+                  {isActivePath("/admin") && (
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-600 rounded-full"></div>
+                  )}
+                </Link>
+              )}
             </div>
           </div>
 
@@ -135,9 +153,14 @@ const Navbar = () => {
                       </span>
                     )}
                   </div>
-                  <span className="text-gray-900 font-medium group-hover:text-emerald-600 transition-colors duration-300">
-                    {currentUser.fullname || currentUser.username || "User"}
-                  </span>
+                  <div className="flex flex-col items-start">
+                    <span className="text-gray-900 font-medium group-hover:text-emerald-600 transition-colors duration-300">
+                      {currentUser.fullname || currentUser.username || "User"}
+                    </span>
+                    <span className="text-xs text-emerald-600 font-bold">
+                      {balance !== null ? `${balance} Hydcoin` : "..."}
+                    </span>
+                  </div>
                   {/* Hover arrow indicator */}
                   <svg
                     className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all duration-300"
@@ -228,6 +251,19 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setIsMenuOpen(false)}
+                className={`block px-4 py-3 text-base font-medium rounded-lg transition-all duration-300 transform hover:scale-105 ${
+                  isActivePath("/admin")
+                    ? "bg-red-50 text-red-600 border-l-4 border-red-600"
+                    : "text-gray-900 hover:bg-gray-50 hover:text-red-600"
+                }`}
+              >
+                Admin
+              </Link>
+            )}
 
             {/* Mobile Profile Link */}
             <Authenticated>

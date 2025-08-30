@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import { SignOutButton } from "@clerk/clerk-react";
 import { useAuth } from "@clerk/clerk-react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ const ProfilePage = () => {
   const { user, isLoading } = useUser();
   const { isSignedIn, userId } = useAuth();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const transactions = useQuery(api.hydcoin.getTransactions);
 
   // Convex mutation for updating user
   const updateUser = useMutation(api.users.updateUser);
@@ -360,40 +361,36 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Recent Activity Section */}
+      {/* Transaction History Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-              <span className="text-white text-xl">📊</span>
+              <span className="text-white text-xl">📜</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Recent Activity</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Transaction History</h2>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">🎯</span>
-                <h3 className="font-semibold text-gray-900">Last Login</h3>
-              </div>
-              <p className="text-gray-600">Today at 9:30 AM</p>
-            </div>
 
-            <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-100">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">💳</span>
-                <h3 className="font-semibold text-gray-900">Credits Used</h3>
-              </div>
-              <p className="text-gray-600">150 credits this month</p>
-            </div>
-
-            <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">🔔</span>
-                <h3 className="font-semibold text-gray-900">Notifications</h3>
-              </div>
-              <p className="text-gray-600">3 unread messages</p>
-            </div>
+          <div className="space-y-4">
+            {transactions && transactions.length > 0 ? (
+              transactions.map((tx) => (
+                <div key={tx._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900 capitalize">
+                      {tx.type === 'purchase' ? 'Hydcoin Purchase' : `Transfer to @${tx.toUsername}`}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(tx._creationTime).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`text-lg font-bold ${tx.currentUserIsSender ? 'text-red-500' : 'text-green-500'}`}>
+                    {tx.currentUserIsSender ? '-' : '+'}{tx.amount} Hydcoin
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-600 text-center py-4">No transactions yet.</p>
+            )}
           </div>
         </div>
       </div>

@@ -117,6 +117,24 @@ export async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
   return currentUser;
 }
 
+export const getCurrentUser = query({
+  handler: async (ctx) => {
+    return await getAuthenticatedUser(ctx);
+  },
+});
+
+export const isAdminUser = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
+
+    const adminClerkId = process.env.ADMIN_CLERK_ID;
+    if (!adminClerkId) return false;
+
+    return identity.subject === adminClerkId;
+  },
+});
+
 export const getUserByClerkId = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -163,5 +181,26 @@ export const updateUser = mutation({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+  },
+});
+
+// Internal mutation to process a withdrawal request (approve/reject)
+export const processWithdrawal = internalMutation({
+  args: {
+    requestId: v.id("withdrawal_requests"),
+    outcome: v.union(v.literal("processed"), v.literal("failed")),
+  },
+  handler: async (ctx, { requestId, outcome }) => {
+    const request = await ctx.db.get(requestId);
+    if (!request) throw new Error("Request not found");
+
+    // Update the request status
+    await ctx.db.patch(requestId, { status: outcome, processedAt: Date.now() });
+
+    // If processed, mark credits as retired. If failed, mark them as active again.
+    const newStatus = outcome === "processed" ? "retired" : "active";
+    for (const creditId of request.creditIds) {
+      await ctx.db.patch(creditId, { status: newStatus });
+    }
   },
 });
