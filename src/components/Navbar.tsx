@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { SignInButton } from "@clerk/clerk-react";
-import { Authenticated, Unauthenticated, useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useUser } from "../context/UserContext";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
 
 // Custom RotateLoader component
 const RotateLoader = ({ color = "#059669", size = 8, speedMultiplier = 1 }) => (
@@ -35,10 +35,17 @@ const RotateLoader = ({ color = "#059669", size = 8, speedMultiplier = 1 }) => (
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user: currentUser } = useUser();
-  const { isLoading } = useConvexAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const currentUser = useQuery(api.users.getCurrentUser);
   const balance = useQuery(api.hydcoin.getBalance);
-  const isAdmin = useQuery(api.users.isAdminUser);
+  const isAdmin = useQuery(
+    api.users.isAdminUser,
+    isLoading || !isAuthenticated ? "skip" : undefined
+  );
+  const isCertifierOrAdmin = useQuery(
+    api.users.isCertifierOrAdmin,
+    isLoading || !isAuthenticated ? "skip" : undefined
+  );
   const location = useLocation();
 
   const navItems = [
@@ -110,22 +117,34 @@ const Navbar = () => {
                   )}
                 </Link>
               )}
+              {isCertifierOrAdmin && (
+                <Link
+                  to="/certifier"
+                  className={`relative px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
+                    isActivePath("/certifier")
+                      ? "bg-white text-blue-600 shadow-md border border-blue-100"
+                      : "text-gray-600 hover:text-blue-600 hover:bg-white/80"
+                  }`}
+                >
+                  Certifier Dashboard
+                  {isActivePath("/certifier") && (
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full"></div>
+                  )}
+                </Link>
+              )}
             </div>
           </div>
 
           {/* Right Side - Auth & Profile */}
           <div className="flex items-center space-x-4">
-            {/* Show Sign In when user is not logged in */}
-            <Unauthenticated>
+            <SignedOut>
               <SignInButton mode="modal">
                 <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg active:scale-95">
                   Sign In
                 </button>
               </SignInButton>
-            </Unauthenticated>
-
-            {/* Show User Profile when logged in */}
-            <Authenticated>
+            </SignedOut>
+            <SignedIn>
               {isLoading ? (
                 // Loading state with RotateLoader
                 <div className="flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
@@ -184,7 +203,7 @@ const Navbar = () => {
                   </span>
                 </div>
               )}
-            </Authenticated>
+            </SignedIn>
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -263,9 +282,22 @@ const Navbar = () => {
                 Admin
               </Link>
             )}
+            {isCertifierOrAdmin && (
+              <Link
+                to="/certifier"
+                onClick={() => setIsMenuOpen(false)}
+                className={`block px-4 py-3 text-base font-medium rounded-lg transition-all duration-300 transform hover:scale-105 ${
+                  isActivePath("/certifier")
+                    ? "bg-blue-50 text-blue-600 border-l-4 border-blue-600"
+                    : "text-gray-900 hover:bg-gray-50 hover:text-blue-600"
+                }`}
+              >
+                Certifier Dashboard
+              </Link>
+            )}
 
             {/* Mobile Profile Link */}
-            <Authenticated>
+            <SignedIn>
               {isLoading ? (
                 <div className="flex items-center space-x-3 px-4 py-3">
                   <RotateLoader
@@ -284,16 +316,16 @@ const Navbar = () => {
                   Profile
                 </Link>
               ) : null}
-            </Authenticated>
+            </SignedIn>
 
             {/* Mobile Sign In */}
-            <Unauthenticated>
+            <SignedOut>
               <SignInButton mode="modal">
                 <button className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 active:scale-95">
                   Sign In
                 </button>
               </SignInButton>
-            </Unauthenticated>
+            </SignedOut>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 // --- QUERIES ---
 
@@ -108,12 +109,9 @@ export const getUserTransactions = query({
 // Query to get the current user's withdrawal history
 export const getPendingWithdrawals = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const adminClerkId = process.env.ADMIN_CLERK_ID;
-    if (identity.subject !== adminClerkId) {
-      return []; // Only admins can see pending requests
+    const isAuthorized = await ctx.runQuery(api.users.isCertifierOrAdmin);
+    if (!isAuthorized) {
+      return []; // Only admins or certifiers can see pending requests
     }
 
     const pendingWithdrawals = await ctx.db

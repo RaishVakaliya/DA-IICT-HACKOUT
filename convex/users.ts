@@ -24,7 +24,6 @@ export const syncUser = internalMutation({
         v.literal("certifier"),
         v.literal("buyer"),
         v.literal("regulator"),
-        v.literal("auditor")
       )
     ),
   },
@@ -44,8 +43,16 @@ export const syncUser = internalMutation({
         image: args.image,
         ...(args.role && { role: args.role }),
       });
+      // If the user is the admin, ensure their role is set to "admin"
+      if (args.clerkId === process.env.ADMIN_CLERK_ID) {
+        await ctx.db.patch(existingUser._id, { role: "admin" });
+      }
       return existingUser._id;
     }
+
+    // Determine the role for the new user
+    const isAdmin = args.clerkId === process.env.ADMIN_CLERK_ID;
+    const userRole = isAdmin ? "admin" : args.role || "buyer";
 
     // Create new user
     const userId = await ctx.db.insert("users", {
@@ -54,7 +61,7 @@ export const syncUser = internalMutation({
       fullname: args.fullname,
       username: args.username,
       image: args.image,
-      role: args.role || "buyer", // Default role
+      role: userRole, // Default role
       posts: 0, // Initialize posts count
       searchable: true, // Default to searchable
     });
@@ -76,7 +83,6 @@ export const createUser = mutation({
         v.literal("certifier"),
         v.literal("buyer"),
         v.literal("regulator"),
-        v.literal("auditor")
       )
     ),
   },
@@ -127,15 +133,28 @@ export const getCurrentUser = query({
   },
 });
 
+export const isCertifierOrAdmin = query({
+  handler: async (ctx) => {
+    const user = await getAuthenticatedUser(ctx);
+    const adminClerkId = process.env.ADMIN_CLERK_ID;
+    return (
+      user.role === "certifier" ||
+      user.role === "admin" ||
+      user.clerkId === adminClerkId
+    );
+  },
+});
+
 export const isAdminUser = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return false;
-
-    const adminClerkId = process.env.ADMIN_CLERK_ID;
-    if (!adminClerkId) return false;
-
-    return identity.subject === adminClerkId;
+    try {
+      const user = await getAuthenticatedUser(ctx);
+      return user.role === "admin";
+    } catch (error) {
+      // If getAuthenticatedUser throws an error (e.g., user not found or not authenticated),
+      // they are not an admin.
+      return false;
+    }
   },
 });
 
@@ -405,9 +424,9 @@ export const submitProducerApplication = mutation({
 export const getPendingProducerApplications = query({
   handler: async (ctx) => {
     // Only allow administrators to call this query
-    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
-    if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can view pending applications.");
+    const isAuthorized = await ctx.runQuery(api.users.isCertifierOrAdmin);
+    if (!isAuthorized) {
+      throw new Error("Unauthorized: Only administrators or certifiers can view pending applications.");
     }
 
     const pendingApplications = await ctx.db
@@ -438,9 +457,9 @@ export const updateDocumentStatusPublic = mutation({
   },
   handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
     // Ensure the user is an admin before allowing the update
-    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
-    if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can update document status.");
+    const isAuthorized = await ctx.runQuery(api.users.isCertifierOrAdmin);
+    if (!isAuthorized) {
+      throw new Error("Unauthorized: Only administrators or certifiers can update document status.");
     }
     return await ctx.runMutation(internal.users.updateDocumentStatus, args);
   },
@@ -454,11 +473,43 @@ export const updateProducerApplicationStatusPublic = mutation({
   },
   handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
     // Ensure the user is an admin before allowing the update
+    const isAuthorized = await ctx.runQuery(api.users.isCertifierOrAdmin);
+    if (!isAuthorized) {
+      throw new Error("Unauthorized: Only administrators or certifiers can update application status.");
+    }
+    return await ctx.runMutation(
+      internal.users.updateProducerApplicationStatus,
+      args
+    );
+  },
+});
+
+export const getAllUsers = query({
+  handler: async (ctx) => {
     const isAdmin = await ctx.runQuery(api.users.isAdminUser);
     if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can update application status.");
+      throw new Error("Unauthorized: Only administrators can fetch all users.");
     }
-    return await ctx.runMutation(internal.users.updateProducerApplicationStatus, args);
+    return await ctx.db.query("users").collect();
+  },
+});
+
+export const assignRole = mutation({
+  args: {
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("producer"),
+      v.literal("certifier"),
+      v.literal("buyer"),
+      v.literal("regulator"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can assign roles.");
+    }
+    await ctx.db.patch(args.userId, { role: args.role });
   },
 });
 
@@ -510,5 +561,49 @@ export const updateProducerApplicationStatus = internalMutation({
     }
 
     return { success: true, message: `Producer application ${status}.` };
+  },
+});
+
+export const updateWithdrawalRequestStatus = mutation({
+  args: {
+    requestId: v.id("withdrawal_requests"),
+    status: v.union(v.literal("processed"), v.literal("failed")),
+    reviewNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const isAuthorized = await ctx.runQuery(api.users.isCertifierOrAdmin);
+    if (!isAuthorized) {
+      throw new Error("Unauthorized: Only administrators or certifiers can update withdrawal status.");
+    }
+
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+
+    // Update the request status
+    await ctx.db.patch(args.requestId, { 
+      status: args.status, 
+      processedAt: Date.now(),
+      reviewedBy: (await getAuthenticatedUser(ctx))._id,
+      reviewNotes: args.reviewNotes,
+    });
+
+    // Handle the credits based on the outcome
+    for (const creditId of request.creditIds) {
+      if (args.status === "processed") {
+        // On success, the credits are effectively removed from circulation for this user
+        // and handled by the external payout system. We mark them as 'withdrawn'.
+        await ctx.db.patch(creditId, { 
+          status: "withdrawn",
+          retirementDate: Date.now(), // Using retirementDate to signify exit from system
+        });
+      } else {
+        // On failure, return credits to 'active' status in the user's wallet
+        await ctx.db.patch(creditId, { 
+          status: "active" 
+        });
+      }
+    }
+    
+    return { success: true, message: `Withdrawal request ${args.status}.` };
   },
 });
