@@ -10,9 +10,10 @@ const Navbar = () => {
   const location = useLocation();
 
   const navItems = [
+    { name: "Registry", path: "/registry" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Certification", path: "/certification" },
-    { name: "About", path: "/about" }
+    { name: "About", path: "/about" },
   ];
 
   const isActivePath = (path: string) => {
@@ -27,8 +28,8 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="text-2xl font-bold text-emerald-600 hover:text-emerald-700 transition-all duration-300 transform hover:scale-105"
           >
             HyDit
@@ -43,8 +44,8 @@ const Navbar = () => {
                   to={item.path}
                   className={`relative px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
                     isActivePath(item.path)
-                      ? 'bg-white text-emerald-600 shadow-md border border-emerald-100'
-                      : 'text-gray-600 hover:text-emerald-600 hover:bg-white/80'
+                      ? "bg-white text-emerald-600 shadow-md border border-emerald-100"
+                      : "text-gray-600 hover:text-emerald-600 hover:bg-white/80"
                   }`}
                 >
                   {item.name}
@@ -94,13 +95,18 @@ const Navbar = () => {
                     {user.fullname || user.username || "User"}
                   </span>
                   {/* Hover arrow indicator */}
-                  <svg 
-                    className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all duration-300" 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all duration-300"
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </Link>
               )}
@@ -147,14 +153,14 @@ const Navbar = () => {
                 onClick={() => setIsMenuOpen(false)}
                 className={`block px-4 py-3 text-base font-medium rounded-lg transition-all duration-300 transform hover:scale-105 ${
                   isActivePath(item.path)
-                    ? 'bg-emerald-50 text-emerald-600 border-l-4 border-emerald-600'
-                    : 'text-gray-900 hover:bg-gray-50 hover:text-emerald-600'
+                    ? "bg-emerald-50 text-emerald-600 border-l-4 border-emerald-600"
+                    : "text-gray-900 hover:bg-gray-50 hover:text-emerald-600"
                 }`}
               >
                 {item.name}
               </Link>
             ))}
-            
+
             {/* Mobile Profile Link */}
             <Authenticated>
               {!isLoading && user && (
@@ -167,7 +173,7 @@ const Navbar = () => {
                 </Link>
               )}
             </Authenticated>
-            
+
             {/* Mobile Sign In */}
             <Unauthenticated>
               <SignInButton mode="modal">

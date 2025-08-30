@@ -9,13 +9,15 @@ export default defineSchema({
     fullname: v.string(), // John Doe
     email: v.string(), // user email
     image: v.optional(v.string()), // profile image
-    role: v.optional(v.union(
-      v.literal("producer"),
-      v.literal("certifier"),
-      v.literal("buyer"),
-      v.literal("regulator"),
-      v.literal("auditor")
-    )), // user role in HyDit
+    role: v.optional(
+      v.union(
+        v.literal("producer"),
+        v.literal("certifier"),
+        v.literal("buyer"),
+        v.literal("regulator"),
+        v.literal("auditor")
+      )
+    ), // user role in HyDit
     walletAddress: v.optional(v.string()), // MetaMask wallet
     verified: v.optional(v.boolean()), // true if user is KYC/certified
     organization: v.optional(v.string()), // company / agency name
