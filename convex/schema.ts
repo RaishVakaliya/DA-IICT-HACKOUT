@@ -9,6 +9,7 @@ export default defineSchema({
     fullname: v.string(), // John Doe
     email: v.string(), // user email
     image: v.optional(v.string()), // profile image
+    phone: v.optional(v.string()), // phone number
     role: v.optional(
       v.union(
         v.literal("producer"),

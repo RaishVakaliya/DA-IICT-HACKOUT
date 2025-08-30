@@ -2,26 +2,36 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import { SignOutButton } from "@clerk/clerk-react";
 import { useAuth } from "@clerk/clerk-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ProfilePage = () => {
   const { user, isLoading } = useUser();
   const { isSignedIn } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     fullname: user?.fullname || "",
     username: user?.username || "",
-    organization: user?.organization || "",
+    image: user?.image || "",
   });
+  const [imagePreview, setImagePreview] = useState(user?.image || "");
 
   if (!isSignedIn) {
     return (
-      <div className="min-h-screen bg-gray-100 pt-20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20">
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 text-center border border-white/20">
+            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="text-3xl text-white">🔒</span>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
               Please Sign In
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-lg">
               You need to be signed in to view your profile.
             </p>
           </div>
@@ -32,11 +42,11 @@ const ProfilePage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 pt-20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20">
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Loading profile...</p>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 text-center border border-white/20">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+            <p className="text-gray-600 mt-6 text-lg">Loading your profile...</p>
           </div>
         </div>
       </div>
@@ -49,180 +59,297 @@ const ProfilePage = () => {
       ...prev,
       [name]: value
     }));
+
+    // Update image preview when image URL changes
+    if (name === 'image') {
+      setImagePreview(value);
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsSaving(true);
     // TODO: Implement update user mutation
-    setIsEditing(false);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+    setIsSaving(false);
+    setIsEditDialogOpen(false);
   };
 
   const handleCancel = () => {
     setFormData({
       fullname: user?.fullname || "",
       username: user?.username || "",
-      organization: user?.organization || "",
+      image: user?.image || "",
     });
-    setIsEditing(false);
+    setImagePreview(user?.image || "");
+    setIsEditDialogOpen(false);
   };
 
+  const stats = [
+    { label: "Credits Earned", value: "2,450", icon: "🏆", color: "from-yellow-400 to-orange-500" },
+    { label: "Projects", value: "12", icon: "🚀", color: "from-blue-400 to-cyan-500" },
+    { label: "Verifications", value: "8", icon: "✅", color: "from-green-400 to-emerald-500" },
+    { label: "Member Since", value: "2024", icon: "📅", color: "from-purple-400 to-pink-500" }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-100 pt-20">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {/* Header */}
-          <div className="bg-emerald-600 px-6 py-8 text-white">
-            <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                {user?.image ? (
-                  <img
-                    src={user.image}
-                    alt="Profile"
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="text-2xl text-emerald-600 font-bold">
-                    {user?.fullname?.charAt(0) || "U"}
-                  </span>
-                )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <div className="relative inline-block mb-8">
+              <Avatar className="w-32 h-32 border-4 border-white/20 shadow-2xl">
+                <AvatarImage src={user?.image} alt="Profile" />
+                <AvatarFallback className="text-4xl font-bold bg-white/10 text-white">
+                  {user?.fullname?.charAt(0) || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
+                <span className="text-white text-sm">✓</span>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold">{user?.fullname || "User"}</h1>
-                <p className="text-emerald-100">@{user?.username || "username"}</p>
-                <p className="text-emerald-100">{user?.email}</p>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">{user?.fullname || "User"}</h1>
+            <p className="text-xl text-blue-100 mb-6">@{user?.username || "username"}</p>
+            <p className="text-lg text-blue-100 mb-8">{user?.email}</p>
+            
+            <div className="flex flex-wrap justify-center gap-4">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="bg-white/20 hover:bg-white/30 text-white border-2 border-white/30 backdrop-blur-sm">
+                    ✏️ Edit Profile
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">Edit Profile</DialogTitle>
+                    <DialogDescription>
+                      Update your profile information and image.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-6 py-4">
+                    {/* Profile Image Section */}
+                    <div className="space-y-3">
+                      <Label htmlFor="image" className="text-sm font-semibold">Profile Image URL</Label>
+                      <Input
+                        id="image"
+                        name="image"
+                        type="url"
+                        placeholder="https://example.com/image.jpg"
+                        value={formData.image}
+                        onChange={handleInputChange}
+                        className="w-full"
+                      />
+                      
+                      {/* Image Preview */}
+                      {imagePreview && (
+                        <div className="text-center">
+                          <Label className="text-sm text-gray-600 mb-2 block">Preview:</Label>
+                          <Avatar className="w-20 h-20 mx-auto border-2 border-gray-200">
+                            <AvatarImage src={imagePreview} alt="Preview" />
+                            <AvatarFallback className="text-lg">?</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Full Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="fullname" className="text-sm font-semibold">Full Name</Label>
+                      <Input
+                        id="fullname"
+                        name="fullname"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={formData.fullname}
+                        onChange={handleInputChange}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Username */}
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
+                      <Input
+                        id="username"
+                        name="username"
+                        type="text"
+                        placeholder="Enter username"
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button 
+                      onClick={handleSave} 
+                      disabled={isSaving}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <SignOutButton>
+                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm">
+                  🚪 Sign Out
+                </Button>
+              </SignOutButton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map((stat, index) => (
+            <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 border border-white/20">
+              <div className={`w-16 h-16 bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-4`}>
+                <span className="text-3xl">{stat.icon}</span>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 mb-2">{stat.value}</div>
+                <div className="text-gray-600 font-medium">{stat.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Profile Details Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Personal Information */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <span className="text-white text-xl">👤</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Full Name</p>
+                  <p className="text-lg font-semibold text-gray-900">{user?.fullname || "Not set"}</p>
+                </div>
+                <span className="text-2xl">👤</span>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Username</p>
+                  <p className="text-lg font-semibold text-gray-900">@{user?.username || "Not set"}</p>
+                </div>
+                <span className="text-2xl">🏷️</span>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Email</p>
+                  <p className="text-lg font-semibold text-gray-900">{user?.email}</p>
+                </div>
+                <span className="text-2xl">📧</span>
               </div>
             </div>
           </div>
 
-          {/* Profile Content */}
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Personal Information */}
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">
-                  Personal Information
-                </h2>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Full Name
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        name="fullname"
-                        value={formData.fullname}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-gray-900">{user?.fullname || "Not set"}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Username
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-gray-900">@{user?.username || "Not set"}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <p className="text-gray-900">{user?.email}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Organization
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        name="organization"
-                        value={formData.organization}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-gray-900">{user?.organization || "Not set"}</p>
-                    )}
-                  </div>
+          {/* Account Information */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <span className="text-white text-xl">⚙️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Account Information</h2>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Role</p>
+                  <p className="text-lg font-semibold text-gray-900 capitalize">{user?.role || "Not assigned"}</p>
                 </div>
+                <span className="text-2xl">🎭</span>
               </div>
 
-              {/* Account Actions */}
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">
-                  Account Actions
-                </h2>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Role
-                    </label>
-                    <p className="text-gray-900 capitalize">{user?.role || "Not assigned"}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Verification Status
-                    </label>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user?.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {user?.verified ? 'Verified' : 'Pending Verification'}
-                    </span>
-                  </div>
-
-                  <div className="pt-4">
-                    {isEditing ? (
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={handleSave}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
-                        >
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md font-medium transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
-                      >
-                        Edit Profile
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="pt-4">
-                    <SignOutButton>
-                      <button className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
-                        Sign Out
-                      </button>
-                    </SignOutButton>
-                  </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Verification Status</p>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    user?.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {user?.verified ? '✅ Verified' : '⏳ Pending Verification'}
+                  </span>
                 </div>
+                <span className="text-2xl">🔒</span>
               </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Member Since</p>
+                  <p className="text-lg font-semibold text-gray-900">January 2024</p>
+                </div>
+                <span className="text-2xl">📅</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+              <span className="text-white text-xl">📊</span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Recent Activity</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">🎯</span>
+                <h3 className="font-semibold text-gray-900">Last Login</h3>
+              </div>
+              <p className="text-gray-600">Today at 9:30 AM</p>
+            </div>
+
+            <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">💳</span>
+                <h3 className="font-semibold text-gray-900">Credits Used</h3>
+              </div>
+              <p className="text-gray-600">150 credits this month</p>
+            </div>
+
+            <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">🔔</span>
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+              </div>
+              <p className="text-gray-600">3 unread messages</p>
             </div>
           </div>
         </div>
