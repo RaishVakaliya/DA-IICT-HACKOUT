@@ -115,7 +115,7 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white">
+      <div className="bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
             <div className="relative inline-block mb-8">
@@ -130,8 +130,8 @@ const ProfilePage = () => {
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{user?.fullname || "User"}</h1>
-            <p className="text-xl text-blue-100 mb-6">@{user?.username || "username"}</p>
-            <p className="text-lg text-blue-100 mb-8">{user?.email}</p>
+            <p className="text-xl text-sky-100 mb-6">{user?.username || "username"}</p>
+            <p className="text-lg text-sky-100 mb-8">{user?.email}</p>
             
             <div className="flex flex-wrap justify-center gap-4">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -221,7 +221,7 @@ const ProfilePage = () => {
                     <Button 
                       onClick={handleSave} 
                       disabled={isSaving}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      className="flex-1 bg-sky-600 hover:bg-sky-700"
                     >
                       {isSaving ? (
                         <>
@@ -245,7 +245,7 @@ const ProfilePage = () => {
               </Dialog>
 
               <SignOutButton>
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm">
+                <Button size="lg" className="bg-white/20 hover:bg-white/30 text-white border-2 border-white/30 backdrop-blur-sm">
                   🚪 Sign Out
                 </Button>
               </SignOutButton>
@@ -277,43 +277,51 @@ const ProfilePage = () => {
           {/* Personal Information */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-sky-500 to-blue-600 rounded-xl flex items-center justify-center">
                 <span className="text-white text-xl">👤</span>
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
             </div>
             
-            <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Full Name</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">👤</span>
+                  <span className="text-sm font-medium text-gray-600">Full Name</span>
+                </div>
+                <div className="md:col-span-2">
                   <p className="text-lg font-semibold text-gray-900">{user?.fullname || "Not set"}</p>
                 </div>
-                <span className="text-2xl">👤</span>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Username</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🏷️</span>
+                  <span className="text-sm font-medium text-gray-600">Username</span>
+                </div>
+                <div className="md:col-span-2">
                   <p className="text-lg font-semibold text-gray-900">@{user?.username || "Not set"}</p>
                 </div>
-                <span className="text-2xl">🏷️</span>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Email</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📧</span>
+                  <span className="text-sm font-medium text-gray-600">Email</span>
+                </div>
+                <div className="md:col-span-2">
                   <p className="text-lg font-semibold text-gray-900">{user?.email}</p>
                 </div>
-                <span className="text-2xl">📧</span>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Phone Number</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📱</span>
+                  <span className="text-sm font-medium text-gray-600">Phone Number</span>
+                </div>
+                <div className="md:col-span-2">
                   <p className="text-lg font-semibold text-gray-900">{user?.phone || "Not set"}</p>
                 </div>
-                <span className="text-2xl">📱</span>
               </div>
             </div>
           </div>
