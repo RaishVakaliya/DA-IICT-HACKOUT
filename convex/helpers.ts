@@ -50,3 +50,49 @@ export const getCreditsMissingSource = internalQuery({
     return missingSourceCredits;
   },
 });
+
+export const migrateUsersSchema = internalMutation({
+  handler: async (ctx) => {
+    console.log("Starting users schema migration...");
+    const usersToMigrate = await ctx.db.query("users").collect();
+
+    for (const user of usersToMigrate) {
+      const patchData: any = {};
+      if (user.documents !== undefined) {
+        patchData.documents = undefined; // Remove the field
+      }
+      if (user.producerApplicationStatus !== undefined) {
+        patchData.producerApplicationStatus = undefined; // Remove the field
+      }
+      if (user.producerDetails !== undefined) {
+        patchData.producerDetails = undefined; // Remove the field
+      }
+
+      if (Object.keys(patchData).length > 0) {
+        await ctx.db.patch(user._id, patchData);
+        console.log(`Patched user ${user._id} to remove old producer fields.`);
+      }
+    }
+    console.log("Users schema migration completed.");
+  },
+});
+
+export const migrateUserHydcoinBalances = internalMutation({
+  handler: async (ctx) => {
+    console.log("Starting Hydcoin balance migration...");
+    const users = await ctx.db.query("users").collect();
+
+    for (const user of users) {
+      const activeCreditsCount = await ctx.db
+        .query("hydcoin_credits")
+        .withIndex("by_ownerId_status", (q) =>
+          q.eq("ownerId", user._id).eq("status", "active")
+        )
+        .collect(); // Still using collect().length for counting after discussion
+
+      await ctx.db.patch(user._id, { hydcoinBalance: activeCreditsCount.length });
+      console.log(`User ${user.username} (${user._id}) balance updated to ${activeCreditsCount.length}.`);
+    }
+    console.log("Hydcoin balance migration completed.");
+  },
+});

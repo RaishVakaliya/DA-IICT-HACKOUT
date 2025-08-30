@@ -26,6 +26,12 @@ export default defineSchema({
     searchable: v.optional(v.boolean()), // whether user can be searched
     stripeAccountId: v.optional(v.string()), // For Stripe Connect payouts
     stripeCustomerId: v.optional(v.string()), // For Stripe Checkout
+    hydcoinBalance: v.optional(v.number()), // New field to store the user's total Hydcoin balance
+    // IMPORTANT: Producer-related fields (`producerApplicationStatus`, `producerDetails`, `documents`) 
+    // have been moved to the `producer_applications` table. 
+    // These optional fields are temporarily re-added here to allow existing data to validate 
+    // during deployment, IF a prior migration failed. They should be removed after a successful
+    // data migration if they are still present in old user documents.
     producerApplicationStatus: v.optional(v.union(
       v.literal("not_applied"),
       v.literal("pending"),
@@ -47,6 +53,31 @@ export default defineSchema({
     }))),
   }).index("by_clerk_id", ["clerkId"]),
 
+  // Producer Applications table
+  producer_applications: defineTable({
+    userId: v.id("users"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    producerDetails: v.object({
+      companyName: v.string(),
+      registrationNumber: v.string(),
+      businessAddress: v.string(),
+      contactPerson: v.string(),
+      website: v.optional(v.string()),
+    }),
+    documents: v.array(v.object({
+      type: v.string(),
+      url: v.string(), // URL to the uploaded document
+      uploadDate: v.number(),
+      status: v.union(v.literal("pending"), v.literal("verified"), v.literal("rejected")),
+    })),
+    reviewNotes: v.optional(v.string()), // Notes from admin review
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+  }).index("by_userId", ["userId"]),
 
   // Transactions table for Hydcoin
   transactions: defineTable({
@@ -92,7 +123,9 @@ export default defineSchema({
     )),
     issueDate: v.optional(v.number()), // Timestamp of issuance
     retirementDate: v.optional(v.number()), // Timestamp of retirement
-  }).index("by_ownerId", ["ownerId"]),
+  }).index("by_ownerId", ["ownerId"])
+    .index("by_ownerId_status", ["ownerId", "status"])
+  ,
 
   // Table to track Stripe payment sessions
   purchases: defineTable({
@@ -100,7 +133,6 @@ export default defineSchema({
     stripeId: v.string(),
     credits: v.number(),
   }).index("by_stripe_id", ["stripeId"]),
-
 
   // Table to manage withdrawal requests
   withdrawal_requests: defineTable({
@@ -118,4 +150,23 @@ export default defineSchema({
     processedAt: v.optional(v.number()),
     stripeTransferId: v.optional(v.string()), // To track payout transfer
   }).index("by_userId", ["userId"]),
+
+  // Hydrogen Listings table
+  hydrogen_listings: defineTable({
+    producerId: v.id("users"),
+    quantityKg: v.number(), // Quantity of hydrogen in kilograms
+    pricePerKg: v.number(), // Price per kilogram in a base currency (e.g., INR)
+    listingStatus: v.union(
+      v.literal("active"),
+      v.literal("inactive"),
+      v.literal("sold_out")
+    ),
+    location: v.string(),
+    energySource: v.string(), // e.g., "Solar", "Wind", "Hydroelectric"
+    certificationDetails: v.optional(v.string()), // Link to certification, if any
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_producerId", ["producerId"])
+    .index("by_listingStatus", ["listingStatus"])
+  ,
 });

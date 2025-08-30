@@ -1,23 +1,27 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, FileText, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const AdminPage = () => {
   const isAdmin = useQuery(api.users.isAdminUser); // Check admin status
   const pendingWithdrawals = useQuery(api.hydcoin.getPendingWithdrawals);
   const pendingProducerApplications = useQuery(api.users.getPendingProducerApplications);
-  const updateDocumentStatus = useMutation(api.users.updateDocumentStatus);
-  const updateProducerApplicationStatus = useMutation(api.users.updateProducerApplicationStatus);
+  const updateDocumentStatus = useMutation(api.users.updateDocumentStatusPublic);
+  const updateProducerApplicationStatus = useMutation(api.users.updateProducerApplicationStatusPublic);
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [documentActionLoading, setDocumentActionLoading] = useState<string | null>(null);
   const [applicationActionLoading, setApplicationActionLoading] = useState<string | null>(null);
+  const [reviewNotes, setReviewNotes] = useState<{ [key: string]: string }>({});
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState<string | null>(null);
 
   // Handle access control
   if (isAdmin === undefined) {
@@ -62,10 +66,10 @@ const AdminPage = () => {
     }
   };
 
-  const handleDocumentStatusUpdate = async (userId: string, documentIndex: number, status: "verified" | "rejected") => {
-    setDocumentActionLoading(`${userId}-${documentIndex}-${status}`);
+  const handleDocumentStatusUpdate = async (applicationId: string, documentIndex: number, status: "verified" | "rejected") => {
+    setDocumentActionLoading(`${applicationId}-${documentIndex}-${status}`);
     try {
-      await updateDocumentStatus({ userId, documentIndex, status });
+      await updateDocumentStatus({ applicationId: applicationId as Id<"producer_applications">, documentIndex, status });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,10 +77,20 @@ const AdminPage = () => {
     }
   };
 
-  const handleApplicationStatusUpdate = async (userId: string, status: "approved" | "rejected") => {
-    setApplicationActionLoading(`${userId}-${status}`);
+  const handleApplicationStatusUpdate = async (applicationId: string, status: "approved" | "rejected") => {
+    setApplicationActionLoading(`${applicationId}-${status}`);
     try {
-      await updateProducerApplicationStatus({ userId, status });
+      await updateProducerApplicationStatus({
+        applicationId: applicationId as Id<"producer_applications">,
+        status,
+        reviewNotes: reviewNotes[applicationId] || undefined, // Include review notes if available
+      });
+      setIsRejectDialogOpen(null); // Close dialog on success
+      setReviewNotes(prev => {
+        const newState = { ...prev };
+        delete newState[applicationId];
+        return newState;
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -108,48 +122,80 @@ const AdminPage = () => {
             <p className="text-center text-gray-500 dark:text-gray-400 py-8">No pending producer applications.</p>
           ) : (
             <div className="space-y-6">
-              {pendingProducerApplications.map((user) => (
-                <Card key={user._id} className="p-6 space-y-4 border-l-4 border-blue-500">
+              {pendingProducerApplications.map((app) => (
+                <Card key={app._id} className="p-6 space-y-4 border-l-4 border-blue-500">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xl font-bold text-gray-900">{user.fullname}</p>
-                      <p className="text-gray-600">@{user.username} - {user.email}</p>
+                      <p className="text-xl font-bold text-gray-900">{app.user?.fullname || "Unknown User"}</p>
+                      <p className="text-gray-600">@{app.user?.username || "unknown"} - {app.user?.email || "N/A"}</p>
+                      <p className="text-sm text-gray-500">Applied On: {new Date(app._creationTime).toLocaleDateString()}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => handleApplicationStatusUpdate(user._id, "approved")}
-                        disabled={applicationActionLoading === `${user._id}-approved`}
+                        onClick={() => handleApplicationStatusUpdate(app._id, "approved")}
+                        disabled={applicationActionLoading === `${app._id}-approved`}
                         variant="outline"
                         className="bg-green-500 text-white hover:bg-green-600"
                       >
-                        {applicationActionLoading === `${user._id}-approved` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Approve
+                        {applicationActionLoading === `${app._id}-approved` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Approve
                       </Button>
-                      <Button
-                        onClick={() => handleApplicationStatusUpdate(user._id, "rejected")}
-                        disabled={applicationActionLoading === `${user._id}-rejected`}
-                        variant="outline"
-                        className="bg-red-500 text-white hover:bg-red-600"
-                      >
-                        {applicationActionLoading === `${user._id}-rejected` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />} Reject
-                      </Button>
+
+                      <Dialog open={isRejectDialogOpen === app._id} onOpenChange={(open) => setIsRejectDialogOpen(open ? app._id : null)}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="bg-red-500 text-white hover:bg-red-600"
+                          >
+                            <XCircle className="mr-2 h-4 w-4" /> Reject
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Reject Producer Application</DialogTitle>
+                            <CardDescription>Please provide notes for rejecting this application.</CardDescription>
+                          </DialogHeader>
+                          <div className="py-4">
+                            <Label htmlFor="reviewNotes" className="sr-only">Review Notes</Label>
+                            <Textarea
+                              id="reviewNotes"
+                              placeholder="Enter rejection reasons or notes..."
+                              value={reviewNotes[app._id] || ""}
+                              onChange={(e) => setReviewNotes(prev => ({ ...prev, [app._id]: e.target.value }))}
+                              className="min-h-[100px]"
+                            />
+                          </div>
+                          <DialogFooter>
+                            <DialogClose asChild>
+                              <Button variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button
+                              onClick={() => handleApplicationStatusUpdate(app._id, "rejected")}
+                              disabled={applicationActionLoading === `${app._id}-rejected` || !reviewNotes[app._id]}
+                              className="bg-red-500 hover:bg-red-600 text-white"
+                            >
+                              {applicationActionLoading === `${app._id}-rejected` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm Rejection"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
 
-                  {user.producerDetails && (
+                  {app.producerDetails && (
                     <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold">Producer Details:</h3>
-                      <p><strong>Company:</strong> {user.producerDetails.companyName}</p>
-                      <p><strong>Registration No:</strong> {user.producerDetails.registrationNumber}</p>
-                      <p><strong>Address:</strong> {user.producerDetails.businessAddress}</p>
-                      <p><strong>Contact:</strong> {user.producerDetails.contactPerson}</p>
-                      {user.producerDetails.website && <p><strong>Website:</strong> <a href={user.producerDetails.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{user.producerDetails.website}</a></p>}
+                      <p><strong>Company:</strong> {app.producerDetails.companyName}</p>
+                      <p><strong>Registration No:</strong> {app.producerDetails.registrationNumber}</p>
+                      <p><strong>Address:</strong> {app.producerDetails.businessAddress}</p>
+                      <p><strong>Contact:</strong> {app.producerDetails.contactPerson}</p>
+                      {app.producerDetails.website && <p><strong>Website:</strong> <a href={app.producerDetails.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{app.producerDetails.website}</a></p>}
                     </div>
                   )}
 
-                  {user.documents && user.documents.length > 0 && (
+                  {app.documents && app.documents.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-lg font-semibold">Documents:</h3>
-                      {user.documents.map((doc, docIndex) => (
+                      {app.documents.map((doc, docIndex) => (
                         <div key={docIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-gray-600" />
@@ -162,22 +208,22 @@ const AdminPage = () => {
                           </div>
                           <div className="flex gap-2">
                             <Button
-                              onClick={() => handleDocumentStatusUpdate(user._id, docIndex, "verified")}
-                              disabled={documentActionLoading === `${user._id}-${docIndex}-verified` || doc.status === "verified"}
+                              onClick={() => handleDocumentStatusUpdate(app._id, docIndex, "verified")}
+                              disabled={documentActionLoading === `${app._id}-${docIndex}-verified` || doc.status === "verified"}
                               size="sm"
                               variant="outline"
                               className="bg-green-100 text-green-700 hover:bg-green-200"
                             >
-                              {documentActionLoading === `${user._id}-${docIndex}-verified` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Verify
+                              {documentActionLoading === `${app._id}-${docIndex}-verified` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Verify
                             </Button>
                             <Button
-                              onClick={() => handleDocumentStatusUpdate(user._id, docIndex, "rejected")}
-                              disabled={documentActionLoading === `${user._id}-${docIndex}-rejected` || doc.status === "rejected"}
+                              onClick={() => handleDocumentStatusUpdate(app._id, docIndex, "rejected")}
+                              disabled={documentActionLoading === `${app._id}-${docIndex}-rejected` || doc.status === "rejected"}
                               size="sm"
                               variant="outline"
                               className="bg-red-100 text-red-700 hover:bg-red-200"
                             >
-                              {documentActionLoading === `${user._id}-${docIndex}-rejected` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />} Reject
+                              {documentActionLoading === `${app._id}-${docIndex}-rejected` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />} Reject
                             </Button>
                           </div>
                         </div>

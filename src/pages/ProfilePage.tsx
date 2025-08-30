@@ -17,6 +17,7 @@ const ProfilePage = () => {
   const { isSignedIn, userId } = useAuth();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const transactions = useQuery(api.hydcoin.getTransactions);
+  const myProducerApplication = useQuery(api.users.getMyProducerApplication); // New query
 
   // Convex mutation for updating user
   const updateUser = useMutation(api.users.updateUser);
@@ -32,17 +33,17 @@ const ProfilePage = () => {
   });
   const [imagePreview, setImagePreview] = useState(user?.image || "");
   const [producerFormData, setProducerFormData] = useState({
-    companyName: user?.producerDetails?.companyName || "",
-    registrationNumber: user?.producerDetails?.registrationNumber || "",
-    businessAddress: user?.producerDetails?.businessAddress || "",
-    contactPerson: user?.producerDetails?.contactPerson || "",
-    website: user?.producerDetails?.website || "",
+    companyName: myProducerApplication?.producerDetails?.companyName || "",
+    registrationNumber: myProducerApplication?.producerDetails?.registrationNumber || "",
+    businessAddress: myProducerApplication?.producerDetails?.businessAddress || "",
+    contactPerson: myProducerApplication?.producerDetails?.contactPerson || "",
+    website: myProducerApplication?.producerDetails?.website || "",
   });
   const [documentsToUpload, setDocumentsToUpload] = useState<{
     type: string;
     url: string;
     uploadDate: number;
-  }[]>([]);
+  }[]>(myProducerApplication?.documents.map(doc => ({ type: doc.type, url: doc.url, uploadDate: doc.uploadDate })) || []);
 
   const [documentType, setDocumentType] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
@@ -483,32 +484,78 @@ const ProfilePage = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Become a Green Hydrogen Producer</h2>
               <p className="text-gray-600 mb-6">Apply to become a verified producer and issue your own green hydrogen credits on the platform. Please fill out the details below and upload the required documents.</p>
               
-              {user?.producerApplicationStatus === "approved" ? (
+              {myProducerApplication === undefined ? (
+                <div className="text-center py-8"><Loader2 className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" /><p className="text-gray-600">Loading application status...</p></div>
+              ) : myProducerApplication?.status === "approved" ? (
                 <div className="text-center py-8">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Application Approved!</h3>
                   <p className="text-gray-600">Congratulations! You are now a verified Green Hydrogen Producer.</p>
                   {/* Display producer details */}
-                  {user.producerDetails && (
+                  {myProducerApplication.producerDetails && (
                     <div className="mt-6 text-left inline-block bg-gray-50 p-4 rounded-lg">
-                      <p className="font-semibold">Company Name: <span className="font-normal">{user.producerDetails.companyName}</span></p>
-                      <p className="font-semibold">Registration No.: <span className="font-normal">{user.producerDetails.registrationNumber}</span></p>
-                      <p className="font-semibold">Contact Person: <span className="font-normal">{user.producerDetails.contactPerson}</span></p>
-                      <p className="font-semibold">Website: <span className="font-normal">{user.producerDetails.website || 'N/A'}</span></p>
+                      <p className="font-semibold">Company Name: <span className="font-normal">{myProducerApplication.producerDetails.companyName}</span></p>
+                      <p className="font-semibold">Registration No.: <span className="font-normal">{myProducerApplication.producerDetails.registrationNumber}</span></p>
+                      <p className="font-semibold">Contact Person: <span className="font-normal">{myProducerApplication.producerDetails.contactPerson}</span></p>
+                      <p className="font-semibold">Website: <span className="font-normal">{myProducerApplication.producerDetails.website || 'N/A'}</span></p>
+                    </div>
+                  )}
+                  {myProducerApplication.documents && myProducerApplication.documents.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <p className="text-sm font-semibold text-gray-700">Submitted Documents:</p>
+                      {myProducerApplication.documents.map((doc, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-blue-600" />
+                            <span>{doc.type} - <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Document</a></span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${doc.status === "verified" ? "bg-green-100 text-green-800" : doc.status === "rejected" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}`}>
+                              {doc.status.replace("_", " ").charAt(0).toUpperCase() + doc.status.replace("_", " ").slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              ) : user?.producerApplicationStatus === "pending" ? (
+              ) : myProducerApplication?.status === "pending" ? (
                 <div className="text-center py-8">
                   <Loader2 className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" />
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Application Pending Review</h3>
                   <p className="text-gray-600">Your application is currently being reviewed by our team. We will notify you once a decision has been made.</p>
+                  {/* Display submitted producer details */}
+                  {myProducerApplication.producerDetails && (
+                    <div className="mt-6 text-left inline-block bg-gray-50 p-4 rounded-lg">
+                      <p className="font-semibold">Company Name: <span className="font-normal">{myProducerApplication.producerDetails.companyName}</span></p>
+                      <p className="font-semibold">Registration No.: <span className="font-normal">{myProducerApplication.producerDetails.registrationNumber}</span></p>
+                      <p className="font-semibold">Contact Person: <span className="font-normal">{myProducerApplication.producerDetails.contactPerson}</span></p>
+                      <p className="font-semibold">Website: <span className="font-normal">{myProducerApplication.producerDetails.website || 'N/A'}</span></p>
+                    </div>
+                  )}
+                  {myProducerApplication.documents && myProducerApplication.documents.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <p className="text-sm font-semibold text-gray-700">Submitted Documents:</p>
+                      {myProducerApplication.documents.map((doc, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-blue-600" />
+                            <span>{doc.type} - <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Document</a></span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${doc.status === "verified" ? "bg-green-100 text-green-800" : doc.status === "rejected" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}`}>
+                              {doc.status.replace("_", " ").charAt(0).toUpperCase() + doc.status.replace("_", " ").slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : user?.producerApplicationStatus === "rejected" ? (
+              ) : myProducerApplication?.status === "rejected" ? (
                 <div className="text-center py-8">
                   <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Application Rejected</h3>
                   <p className="text-gray-600">Unfortunately, your application was not approved. Please review the requirements and reapply if necessary.</p>
+                  {myProducerApplication.reviewNotes && (
+                    <p className="text-red-700 mt-4"><strong>Reviewer Notes:</strong> {myProducerApplication.reviewNotes}</p>
+                  )}
                 </div>
               ) : (
                 <form onSubmit={(e) => { e.preventDefault(); handleSubmitProducerApplication(); }} className="space-y-6">

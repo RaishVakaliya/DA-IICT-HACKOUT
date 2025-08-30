@@ -16,16 +16,8 @@ export const getBalance = query({
 
     if (!user) return null;
 
-    const credits = await ctx.db
-      .query("hydcoin_credits")
-      .withIndex("by_ownerId", (q) => q.eq("ownerId", user._id))
-      .filter((q) => q.eq(q.field("status"), "active"))
-      .collect();
-
-    console.log(`User ${user.username} has ${credits.length} active credits`);
-    console.log(`Credit statuses:`, credits.map(c => ({ id: c._id, status: c.status })));
-
-    return credits.length;
+    // Return the pre-calculated hydcoinBalance from the user document
+    return user.hydcoinBalance || 0;
   },
 });
 
@@ -159,6 +151,10 @@ export const transfer = mutation({
       await ctx.db.patch(credit._id, { ownerId: toUser._id });
     }
 
+    // Update hydcoinBalance for both sender and receiver
+    await ctx.db.patch(fromUser._id, { hydcoinBalance: (fromUser.hydcoinBalance || 0) - amount });
+    await ctx.db.patch(toUser._id, { hydcoinBalance: (toUser.hydcoinBalance || 0) + amount });
+
     await ctx.db.insert("transactions", {
       fromUserId: fromUser._id,
       toUserId: toUser._id,
@@ -202,6 +198,9 @@ export const retire = mutation({
         source: credit.source, // Include existing source to satisfy schema
       });
     }
+
+    // Decrease the user's hydcoinBalance
+    await ctx.db.patch(user._id, { hydcoinBalance: (user.hydcoinBalance || 0) - amount });
 
     await ctx.db.insert("transactions", {
       fromUserId: user._id, // The user is 'transferring' to a retired state

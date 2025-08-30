@@ -30,7 +30,7 @@ export const pay = action({
             });
             customerId = customer.id;
             await ctx.runMutation(internal.users.setStripeCustomerId, {
-                userId: user._id,
+                clerkId: user.clerkId,
                 stripeCustomerId: customerId,
             });
         }
@@ -224,5 +224,12 @@ export const fulfill = internalMutation({
                 },
             });
         }
+
+        // Increment the user's hydcoinBalance
+        const user = await ctx.db.get(userId);
+        if (user) {
+          await ctx.db.patch(userId, { hydcoinBalance: (user.hydcoinBalance || 0) + credits });
+        }
+
     },
 });

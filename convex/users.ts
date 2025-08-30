@@ -7,6 +7,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { api, internal } from "./_generated/api";
 
 export const syncUser = internalMutation({
   args: {
@@ -239,30 +240,38 @@ export const getMyUser = internalQuery({
   },
 });
 
-export const getPendingProducerApplications = query({
-  handler: async (ctx) => {
-    // Only allow administrators to call this query
-    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
-    if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can view pending applications.");
+export const setStripeCustomerId = internalMutation({
+  args: {
+    clerkId: v.string(),
+    stripeCustomerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    const pendingApplications = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("producerApplicationStatus"), "pending"))
-      .collect();
+    await ctx.db.patch(user._id, { stripeCustomerId: args.stripeCustomerId });
 
-    return pendingApplications;
+    return user._id;
   },
 });
 
-export const setStripeCustomerId = internalMutation({
-    args: { userId: v.id("users"), stripeCustomerId: v.string() },
-    handler: async (ctx, { userId, stripeCustomerId }) => {
-        await ctx.db.patch(userId, {
-            stripeCustomerId: stripeCustomerId,
-        });
-    },
+export const getMyProducerApplication = query({
+  handler: async (ctx) => {
+    const currentUser = await getAuthenticatedUser(ctx);
+
+    const application = await ctx.db
+      .query("producer_applications")
+      .withIndex("by_userId", (q) => q.eq("userId", currentUser._id))
+      .first();
+
+    return application;
+  },
 });
 
 export const submitProducerApplication = mutation({
@@ -283,18 +292,30 @@ export const submitProducerApplication = mutation({
   handler: async (ctx, { producerDetails, documents }) => {
     const currentUser = await getAuthenticatedUser(ctx);
 
-    // Ensure the user hasn't already applied or is not already a producer
-    if (currentUser.producerApplicationStatus && currentUser.producerApplicationStatus !== "not_applied") {
-      throw new Error("Producer application already submitted or user is already a producer.");
+    // Check if there's an existing pending or approved application for this user
+    const existingApplication = await ctx.db
+      .query("producer_applications")
+      .withIndex("by_userId", (q) => q.eq("userId", currentUser._id))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "approved")
+        )
+      )
+      .first();
+
+    if (existingApplication) {
+      throw new Error("An active producer application already exists for this user.");
     }
 
     const newDocuments = documents.map(doc => ({
       ...doc,
-      status: "pending", // Initial status for new documents
+      status: "pending" as "pending", // Initial status for new documents
     }));
 
-    await ctx.db.patch(currentUser._id, {
-      producerApplicationStatus: "pending",
+    await ctx.db.insert("producer_applications", {
+      userId: currentUser._id,
+      status: "pending",
       producerDetails,
       documents: newDocuments,
     });
@@ -303,25 +324,85 @@ export const submitProducerApplication = mutation({
   },
 });
 
-export const updateDocumentStatus = internalMutation({
+export const getPendingProducerApplications = query({
+  handler: async (ctx) => {
+    // Only allow administrators to call this query
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can view pending applications.");
+    }
+
+    const pendingApplications = await ctx.db
+      .query("producer_applications")
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    // Join with users table to get user details for each application
+    const applicationsWithUserDetails = await Promise.all(
+      pendingApplications.map(async (app) => {
+        const user = await ctx.db.get(app.userId);
+        return {
+          ...app,
+          user: user ? { _id: user._id, fullname: user.fullname, username: user.username, email: user.email } : null,
+        };
+      })
+    );
+
+    return applicationsWithUserDetails;
+  },
+});
+
+export const updateDocumentStatusPublic = mutation({
   args: {
-    userId: v.id("users"),
+    applicationId: v.id("producer_applications"),
     documentIndex: v.number(),
     status: v.union(v.literal("verified"), v.literal("rejected")),
   },
-  handler: async (ctx, { userId, documentIndex, status }) => {
-    const user = await ctx.db.get(userId);
-    if (!user) throw new Error("User not found.");
-    if (!user.documents) throw new Error("User has no documents.");
+  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+    // Ensure the user is an admin before allowing the update
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can update document status.");
+    }
+    return await ctx.runMutation(internal.users.updateDocumentStatus, args);
+  },
+});
 
-    const updatedDocuments = [...user.documents];
+export const updateProducerApplicationStatusPublic = mutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    status: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+    // Ensure the user is an admin before allowing the update
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can update application status.");
+    }
+    return await ctx.runMutation(internal.users.updateProducerApplicationStatus, args);
+  },
+});
+
+export const updateDocumentStatus = internalMutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    documentIndex: v.number(),
+    status: v.union(v.literal("verified"), v.literal("rejected")),
+  },
+  handler: async (ctx, { applicationId, documentIndex, status }) => {
+    const application = await ctx.db.get(applicationId);
+    if (!application) throw new Error("Application not found.");
+    if (!application.documents) throw new Error("Application has no documents.");
+
+    const updatedDocuments = [...application.documents];
     if (documentIndex < 0 || documentIndex >= updatedDocuments.length) {
       throw new Error("Document index out of bounds.");
     }
 
     updatedDocuments[documentIndex].status = status;
 
-    await ctx.db.patch(userId, { documents: updatedDocuments });
+    await ctx.db.patch(applicationId, { documents: updatedDocuments });
 
     return { success: true, message: "Document status updated." };
   },
@@ -329,20 +410,26 @@ export const updateDocumentStatus = internalMutation({
 
 export const updateProducerApplicationStatus = internalMutation({
   args: {
-    userId: v.id("users"),
+    applicationId: v.id("producer_applications"),
     status: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNotes: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, status }) => {
-    const user = await ctx.db.get(userId);
-    if (!user) throw new Error("User not found.");
+  handler: async (ctx, { applicationId, status, reviewNotes }) => {
+    const application = await ctx.db.get(applicationId);
+    if (!application) throw new Error("Application not found.");
 
-    // If approved, set role to producer
-    const updateData: Partial<Doc<"users">> = { producerApplicationStatus: status };
+    // Update the application status in producer_applications table
+    await ctx.db.patch(applicationId, {
+      status,
+      reviewNotes,
+      reviewedBy: (await getAuthenticatedUser(ctx))._id, // Assuming admin is authenticated
+      reviewedAt: Date.now(),
+    });
+
+    // If approved, update the user's role to producer
     if (status === "approved") {
-      updateData.role = "producer";
+      await ctx.db.patch(application.userId, { role: "producer" });
     }
-
-    await ctx.db.patch(userId, updateData);
 
     return { success: true, message: `Producer application ${status}.` };
   },

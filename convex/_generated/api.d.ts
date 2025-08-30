@@ -16,6 +16,7 @@ import type {
 import type * as helpers from "../helpers.js";
 import type * as http from "../http.js";
 import type * as hydcoin from "../hydcoin.js";
+import type * as hydrogen_listings from "../hydrogen_listings.js";
 import type * as stripe from "../stripe.js";
 import type * as users from "../users.js";
 
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   helpers: typeof helpers;
   http: typeof http;
   hydcoin: typeof hydcoin;
+  hydrogen_listings: typeof hydrogen_listings;
   stripe: typeof stripe;
   users: typeof users;
 }>;
