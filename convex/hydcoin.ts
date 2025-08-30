@@ -62,6 +62,49 @@ export const getTransactions = query({
   },
 });
 
+export const getUserTransactions = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return [];
+
+    const transactionsAsSender = await ctx.db
+      .query("transactions")
+      .filter((q) => q.eq(q.field("fromUserId"), user._id))
+      .collect();
+
+    const transactionsAsReceiver = await ctx.db
+      .query("transactions")
+      .filter((q) => q.eq(q.field("toUserId"), user._id))
+      .collect();
+
+    const allTransactions = [...transactionsAsSender, ...transactionsAsReceiver];
+    allTransactions.sort((a, b) => b._creationTime - a._creationTime);
+
+    return Promise.all(
+      allTransactions.map(async (tx) => {
+        const fromUser = tx.fromUserId ? await ctx.db.get(tx.fromUserId) : null;
+        const toUser = await ctx.db.get(tx.toUserId);
+        return {
+          _id: tx._id,
+          _creationTime: tx._creationTime,
+          amount: tx.amount,
+          type: tx.type,
+          fromUsername: fromUser ? fromUser.username : "System",
+          toUsername: toUser ? toUser.username : "Unknown",
+          // For public display, we might not want to expose `currentUserIsSender` directly
+          // Instead, we can denote if the `user` (whose profile is being viewed) is involved
+          // isProfileOwnerInvolved: tx.fromUserId === user._id || tx.toUserId === user._id,
+          isProfileOwnerSender: tx.fromUserId === user._id,
+          isProfileOwnerReceiver: tx.toUserId === user._id,
+        };
+      })
+    );
+  },
+});
+
 // Query to get the current user's withdrawal history
 export const getPendingWithdrawals = query({
   handler: async (ctx) => {

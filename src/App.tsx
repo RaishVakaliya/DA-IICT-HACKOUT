@@ -12,6 +12,7 @@ import WalletPage from "./pages/WalletPage";
 import AdminPage from "./pages/AdminPage";
 import Footer from "./components/Footer";
 import Registry from "./pages/Registry";
+import PurchasePage from "./pages/PurchasePage";
 
 function App() {
   return (
@@ -22,13 +23,15 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:userId" element={<ProfilePage />} /> {/* New route for public profiles */}
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/certification" element={<CertificationPage />} />
             <Route path="/registry" element={<Registry />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/retire" element={<RetirePage />} />
-              <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/purchase/:listingId" element={<PurchasePage />} /> {/* New route for purchase page */}
 
             {/* Catch all other routes and redirect to home */}
             <Route path="*" element={<Navigate to="/" replace />} />

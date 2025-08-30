@@ -5,9 +5,11 @@ import {
   internalQuery,
   type QueryCtx,
   type MutationCtx,
+  action,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import bcrypt from "bcryptjs-react";
 
 export const syncUser = internalMutation({
   args: {
@@ -149,6 +151,30 @@ export const getUserByClerkId = query({
   },
 });
 
+export const getUserProfile = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+
+    if (!user) {
+      return null;
+    }
+
+    // Return only public information
+    return {
+      _id: user._id,
+      username: user.username,
+      fullname: user.fullname,
+      image: user.image,
+      organization: user.organization,
+      role: user.role, // Include role as it's part of the producer feature
+      // Add other public fields as needed
+    };
+  },
+});
+
 export const updateUser = mutation({
   args: {
     clerkId: v.string(),
@@ -183,6 +209,58 @@ export const updateUser = mutation({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+  },
+});
+
+export const setTransactionPin = mutation({
+  args: {
+    hashedPin: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      const currentUser = await getAuthenticatedUser(ctx);
+      await ctx.db.patch(currentUser._id, { transactionPin: args.hashedPin });
+      return { success: true, message: "Transaction PIN set successfully." };
+    } catch (error) {
+      console.error("Error in setTransactionPin mutation:", error);
+      throw new Error(`Failed to set transaction PIN: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  },
+});
+
+export const hashPin = action({
+  args: {
+    pin: v.string(),
+  },
+  handler: async (_, args) => {
+    return await bcrypt.hash(args.pin, 10);
+  },
+});
+
+export const getHashedPinForVerification = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    return user?.transactionPin || null;
+  },
+});
+
+export const verifyTransactionPin = action({
+  args: {
+    pin: v.string(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const hashedPin: string | null = await ctx.runQuery(
+      api.users.getHashedPinForVerification,
+      { userId: args.userId }
+    );
+    if (!hashedPin) {
+      return false;
+    }
+    return await bcrypt.compare(args.pin, hashedPin);
   },
 });
 

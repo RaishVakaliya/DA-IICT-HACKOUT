@@ -27,6 +27,7 @@ export default defineSchema({
     stripeAccountId: v.optional(v.string()), // For Stripe Connect payouts
     stripeCustomerId: v.optional(v.string()), // For Stripe Checkout
     hydcoinBalance: v.optional(v.number()), // New field to store the user's total Hydcoin balance
+    transactionPin: v.optional(v.string()), // New field for transaction PIN (hashed)
     // IMPORTANT: Producer-related fields (`producerApplicationStatus`, `producerDetails`, `documents`) 
     // have been moved to the `producer_applications` table. 
     // These optional fields are temporarily re-added here to allow existing data to validate 
