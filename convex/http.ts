@@ -87,31 +87,39 @@ http.route({
 // Stripe Webhook
 const handleStripeWebhook = httpAction(async (ctx, request) => {
   const signature = request.headers.get("stripe-signature") as string;
-  const stripe = new Stripe(process.env.STRIPE_KEY!, { apiVersion: "2025-08-27.basil" });
+  const stripe = new Stripe(process.env.STRIPE_KEY!);
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
-      await request.text(),
+    const body = await request.text();
+    event = await stripe.webhooks.constructEventAsync(
+      body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err) {
-    console.error(err);
+    console.error("Webhook verification failed:", err);
     return new Response("Webhook Error", { status: 400 });
   }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     if (!session.metadata?.userId || !session.metadata?.credits) {
-        return new Response("Missing metadata", { status: 400 });
+      console.error("Webhook received with missing metadata:", session.metadata);
+      return new Response("Missing metadata", { status: 400 });
     }
 
-    await ctx.runMutation(internal.stripe.fulfill, {
-      stripeId: session.id,
-      userId: session.metadata.userId as any,
-      credits: parseInt(session.metadata.credits),
-    });
+    try {
+      await ctx.runMutation(internal.stripe.fulfill, {
+        stripeId: session.id,
+        userId: session.metadata.userId as any,
+        credits: parseInt(session.metadata.credits),
+      });
+    } catch (err) {
+      console.error("Error fulfilling purchase from webhook:", err);
+      // Return a 500 error to indicate failure, Stripe will retry.
+      return new Response("Webhook handler failed", { status: 500 });
+    }
   }
 
   return new Response(null, { status: 200 });

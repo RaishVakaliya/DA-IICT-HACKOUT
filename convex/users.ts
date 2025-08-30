@@ -2,10 +2,12 @@ import {
   mutation,
   query,
   internalMutation,
+  internalQuery,
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { api, internal } from "./_generated/api";
 
 export const syncUser = internalMutation({
   args: {
@@ -195,12 +197,240 @@ export const processWithdrawal = internalMutation({
     if (!request) throw new Error("Request not found");
 
     // Update the request status
-    await ctx.db.patch(requestId, { status: outcome, processedAt: Date.now() });
+    await ctx.db.patch(requestId, { 
+      status: outcome, 
+      processedAt: Date.now() 
+    });
 
-    // If processed, mark credits as retired. If failed, mark them as active again.
-    const newStatus = outcome === "processed" ? "retired" : "active";
+    // Update credit statuses based on outcome
     for (const creditId of request.creditIds) {
-      await ctx.db.patch(creditId, { status: newStatus });
+      if (outcome === "processed") {
+        // Success: retire credits (deduct from wallet)
+        await ctx.db.patch(creditId, { 
+          status: "retired",
+          retirementDate: Date.now(),
+        });
+      } else {
+        // Failure: return credits to active status (back in wallet)
+        await ctx.db.patch(creditId, { 
+          status: "active" 
+        });
+      }
     }
+  },
+});
+
+export const getMyUser = internalQuery({
+  args: {},
+  async handler(ctx) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return user;
+  },
+});
+
+export const setStripeCustomerId = internalMutation({
+  args: {
+    clerkId: v.string(),
+    stripeCustomerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(user._id, { stripeCustomerId: args.stripeCustomerId });
+
+    return user._id;
+  },
+});
+
+export const getMyProducerApplication = query({
+  handler: async (ctx) => {
+    const currentUser = await getAuthenticatedUser(ctx);
+
+    const application = await ctx.db
+      .query("producer_applications")
+      .withIndex("by_userId", (q) => q.eq("userId", currentUser._id))
+      .first();
+
+    return application;
+  },
+});
+
+export const submitProducerApplication = mutation({
+  args: {
+    producerDetails: v.object({
+      companyName: v.string(),
+      registrationNumber: v.string(),
+      businessAddress: v.string(),
+      contactPerson: v.string(),
+      website: v.optional(v.string()),
+    }),
+    documents: v.array(v.object({
+      type: v.string(),
+      url: v.string(),
+      uploadDate: v.number(),
+    })),
+  },
+  handler: async (ctx, { producerDetails, documents }) => {
+    const currentUser = await getAuthenticatedUser(ctx);
+
+    // Check if there's an existing pending or approved application for this user
+    const existingApplication = await ctx.db
+      .query("producer_applications")
+      .withIndex("by_userId", (q) => q.eq("userId", currentUser._id))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "approved")
+        )
+      )
+      .first();
+
+    if (existingApplication) {
+      throw new Error("An active producer application already exists for this user.");
+    }
+
+    const newDocuments = documents.map(doc => ({
+      ...doc,
+      status: "pending" as "pending", // Initial status for new documents
+    }));
+
+    await ctx.db.insert("producer_applications", {
+      userId: currentUser._id,
+      status: "pending",
+      producerDetails,
+      documents: newDocuments,
+    });
+
+    return { success: true, message: "Producer application submitted successfully." };
+  },
+});
+
+export const getPendingProducerApplications = query({
+  handler: async (ctx) => {
+    // Only allow administrators to call this query
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can view pending applications.");
+    }
+
+    const pendingApplications = await ctx.db
+      .query("producer_applications")
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    // Join with users table to get user details for each application
+    const applicationsWithUserDetails = await Promise.all(
+      pendingApplications.map(async (app) => {
+        const user = await ctx.db.get(app.userId);
+        return {
+          ...app,
+          user: user ? { _id: user._id, fullname: user.fullname, username: user.username, email: user.email } : null,
+        };
+      })
+    );
+
+    return applicationsWithUserDetails;
+  },
+});
+
+export const updateDocumentStatusPublic = mutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    documentIndex: v.number(),
+    status: v.union(v.literal("verified"), v.literal("rejected")),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+    // Ensure the user is an admin before allowing the update
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can update document status.");
+    }
+    return await ctx.runMutation(internal.users.updateDocumentStatus, args);
+  },
+});
+
+export const updateProducerApplicationStatusPublic = mutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    status: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+    // Ensure the user is an admin before allowing the update
+    const isAdmin = await ctx.runQuery(api.users.isAdminUser);
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can update application status.");
+    }
+    return await ctx.runMutation(internal.users.updateProducerApplicationStatus, args);
+  },
+});
+
+export const updateDocumentStatus = internalMutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    documentIndex: v.number(),
+    status: v.union(v.literal("verified"), v.literal("rejected")),
+  },
+  handler: async (ctx, { applicationId, documentIndex, status }) => {
+    const application = await ctx.db.get(applicationId);
+    if (!application) throw new Error("Application not found.");
+    if (!application.documents) throw new Error("Application has no documents.");
+
+    const updatedDocuments = [...application.documents];
+    if (documentIndex < 0 || documentIndex >= updatedDocuments.length) {
+      throw new Error("Document index out of bounds.");
+    }
+
+    updatedDocuments[documentIndex].status = status;
+
+    await ctx.db.patch(applicationId, { documents: updatedDocuments });
+
+    return { success: true, message: "Document status updated." };
+  },
+});
+
+export const updateProducerApplicationStatus = internalMutation({
+  args: {
+    applicationId: v.id("producer_applications"),
+    status: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, { applicationId, status, reviewNotes }) => {
+    const application = await ctx.db.get(applicationId);
+    if (!application) throw new Error("Application not found.");
+
+    // Update the application status in producer_applications table
+    await ctx.db.patch(applicationId, {
+      status,
+      reviewNotes,
+      reviewedBy: (await getAuthenticatedUser(ctx))._id, // Assuming admin is authenticated
+      reviewedAt: Date.now(),
+    });
+
+    // If approved, update the user's role to producer
+    if (status === "approved") {
+      await ctx.db.patch(application.userId, { role: "producer" });
+    }
+
+    return { success: true, message: `Producer application ${status}.` };
   },
 });

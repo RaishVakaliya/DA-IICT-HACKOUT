@@ -16,13 +16,8 @@ export const getBalance = query({
 
     if (!user) return null;
 
-    const credits = await ctx.db
-      .query("hydcoin_credits")
-      .withIndex("by_ownerId", (q) => q.eq("ownerId", user._id))
-      .filter((q) => q.eq(q.field("status"), "active"))
-      .collect();
-
-    return credits.length;
+    // Return the pre-calculated hydcoinBalance from the user document
+    return user.hydcoinBalance || 0;
   },
 });
 
@@ -156,6 +151,10 @@ export const transfer = mutation({
       await ctx.db.patch(credit._id, { ownerId: toUser._id });
     }
 
+    // Update hydcoinBalance for both sender and receiver
+    await ctx.db.patch(fromUser._id, { hydcoinBalance: (fromUser.hydcoinBalance || 0) - amount });
+    await ctx.db.patch(toUser._id, { hydcoinBalance: (toUser.hydcoinBalance || 0) + amount });
+
     await ctx.db.insert("transactions", {
       fromUserId: fromUser._id,
       toUserId: toUser._id,
@@ -196,8 +195,12 @@ export const retire = mutation({
       await ctx.db.patch(credit._id, {
         status: "retired",
         retirementDate: Date.now(),
+        source: credit.source, // Include existing source to satisfy schema
       });
     }
+
+    // Decrease the user's hydcoinBalance
+    await ctx.db.patch(user._id, { hydcoinBalance: (user.hydcoinBalance || 0) - amount });
 
     await ctx.db.insert("transactions", {
       fromUserId: user._id, // The user is 'transferring' to a retired state
@@ -256,11 +259,10 @@ export const requestStripePayout = mutation({
 export const requestWithdrawal = mutation({
   args: {
     amount: v.number(),
-    method: v.union(v.literal("upi"), v.literal("credit_card")),
+    method: v.union(v.literal("upi"), v.literal("stripe")),
     details: v.object({
       upiId: v.optional(v.string()),
-      cardholderName: v.optional(v.string()),
-      cardNumber: v.optional(v.string()),
+      stripeAccountId: v.optional(v.string()),
     }),
   },
   handler: async (ctx, { amount, method, details }) => {
@@ -286,8 +288,11 @@ export const requestWithdrawal = mutation({
 
     // Mark credits as pending withdrawal
     for (const credit of creditsToWithdraw) {
+      console.log(`Marking credit ${credit._id} as pending_withdrawal`);
       await ctx.db.patch(credit._id, { status: "pending_withdrawal" });
     }
+
+    console.log(`Created withdrawal request for ${amount} credits. Credits marked as pending_withdrawal.`);
 
     // Create a withdrawal request record
     await ctx.db.insert("withdrawal_requests", {
