@@ -38,7 +38,7 @@ const Navbar = () => {
   const { user: currentUser } = useUser();
   const { isLoading } = useConvexAuth();
   const balance = useQuery(api.hydcoin.getBalance);
-  const isAdmin = useQuery(api.users.isAdminUser);
+  // const isAdmin = useQuery(api.users.isAdminUser);
   const location = useLocation();
 
   const navItems = [
@@ -96,7 +96,7 @@ const Navbar = () => {
                   <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 opacity-0 hover:opacity-100 transition-opacity duration-300 -z-10"></div>
                 </Link>
               ))}
-              {isAdmin && (
+              {/* {isAdmin && (
                 <Link
                   to="/admin"
                   className={`relative px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
@@ -110,7 +110,7 @@ const Navbar = () => {
                     <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-600 rounded-full"></div>
                   )}
                 </Link>
-              )}
+              )} */}
             </div>
           </div>
 
@@ -251,7 +251,7 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
-            {isAdmin && (
+            {/* {isAdmin && (
               <Link
                 to="/admin"
                 onClick={() => setIsMenuOpen(false)}
@@ -263,7 +263,7 @@ const Navbar = () => {
               >
                 Admin
               </Link>
-            )}
+            )} */}
 
             {/* Mobile Profile Link */}
             <Authenticated>

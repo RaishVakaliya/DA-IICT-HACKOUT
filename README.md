@@ -33,8 +33,8 @@ A modern web application built with React, TypeScript, and TailwindCSS, featurin
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/RaishVakaliya/DA-IICT-HACKOUT.git
-   cd DA-IICT-HACKOUT
+   git clone https://github.com/RaishVakaliya/LA_CASA_DE_CODE-PS1.git
+   cd LA_CASA_DE_CODE-PS1
    ```
 
 2. **Install dependencies**
@@ -72,19 +72,6 @@ npm run build
 
 # Preview the production build
 npm run preview
-```
-
-## Project Structure
-
-```
-src/
-├── assets/           # Static assets (images, fonts, etc.)
-├── components/       # Reusable UI components
-│   └── ui/          # Radix UI components
-├── context/          # React context providers
-├── lib/              # Utility functions and helpers
-├── pages/            # Application pages/routes
-└── providers/        # Application providers
 ```
 
 ## Contributing
