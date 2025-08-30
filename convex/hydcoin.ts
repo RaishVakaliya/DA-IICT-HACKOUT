@@ -22,6 +22,9 @@ export const getBalance = query({
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
+    console.log(`User ${user.username} has ${credits.length} active credits`);
+    console.log(`Credit statuses:`, credits.map(c => ({ id: c._id, status: c.status })));
+
     return credits.length;
   },
 });
@@ -286,8 +289,11 @@ export const requestWithdrawal = mutation({
 
     // Mark credits as pending withdrawal
     for (const credit of creditsToWithdraw) {
+      console.log(`Marking credit ${credit._id} as pending_withdrawal`);
       await ctx.db.patch(credit._id, { status: "pending_withdrawal" });
     }
+
+    console.log(`Created withdrawal request for ${amount} credits. Credits marked as pending_withdrawal.`);
 
     // Create a withdrawal request record
     await ctx.db.insert("withdrawal_requests", {

@@ -131,18 +131,34 @@ export const processPayout = internalAction({
 
     const stripe = new Stripe(process.env.STRIPE_KEY!);
 
-    const transfer = await stripe.transfers.create({
-      amount: withdrawal.amount * 83 * 100, // Amount in paise (1 credit = 83 INR)
-      currency: "inr", // set currency to 'inr' for UPI payments
-      destination: withdrawal.user.stripeAccountId,
-      transfer_group: `withdrawal_${withdrawalId}`,
-    });
+    try {
+      const transfer = await stripe.transfers.create({
+        amount: withdrawal.amount * 83 * 100, // Amount in paise (1 credit = 83 INR)
+        currency: "inr", // set currency to 'inr' for UPI payments
+        destination: withdrawal.user.stripeAccountId,
+        transfer_group: `withdrawal_${withdrawalId}`,
+      });
 
-    await ctx.runMutation(internal.stripe.finalizePayout, {
-      withdrawalId,
-      stripeTransferId: transfer.id,
-      creditIds: withdrawal.creditIds,
-    });
+      // Success - mark as processed and retire credits
+      await ctx.runMutation(internal.stripe.finalizePayout, {
+        withdrawalId,
+        stripeTransferId: transfer.id,
+        creditIds: withdrawal.creditIds,
+        outcome: "processed",
+      });
+    } catch (error) {
+      console.error("Stripe payout failed:", error);
+      
+      // Failure - mark as failed and return credits to active status
+      await ctx.runMutation(internal.stripe.finalizePayout, {
+        withdrawalId,
+        stripeTransferId: "",
+        creditIds: withdrawal.creditIds,
+        outcome: "failed",
+      });
+      
+      throw error; // Re-throw to indicate failure
+    }
   },
 });
 
@@ -151,19 +167,30 @@ export const finalizePayout = internalMutation({
     withdrawalId: v.id("withdrawal_requests"),
     stripeTransferId: v.string(),
     creditIds: v.array(v.id("hydcoin_credits")),
+    outcome: v.union(v.literal("processed"), v.literal("failed")),
   },
-  handler: async (ctx, { withdrawalId, stripeTransferId, creditIds }) => {
+  handler: async (ctx, { withdrawalId, stripeTransferId, creditIds, outcome }) => {
+    // Update withdrawal request status
     await ctx.db.patch(withdrawalId, {
-      status: "processed",
-      stripeTransferId,
+      status: outcome,
+      stripeTransferId: outcome === "processed" ? stripeTransferId : undefined,
       processedAt: Date.now(),
     });
 
+    // Update credit statuses based on outcome
     for (const creditId of creditIds) {
-      await ctx.db.patch(creditId, {
-        status: "retired",
-        retirementDate: Date.now(),
-      });
+      if (outcome === "processed") {
+        // Success: retire credits (deduct from wallet)
+        await ctx.db.patch(creditId, {
+          status: "retired",
+          retirementDate: Date.now(),
+        });
+      } else {
+        // Failure: return credits to active status (back in wallet)
+        await ctx.db.patch(creditId, {
+          status: "active",
+        });
+      }
     }
   },
 });

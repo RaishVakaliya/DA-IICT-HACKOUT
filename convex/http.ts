@@ -91,13 +91,14 @@ const handleStripeWebhook = httpAction(async (ctx, request) => {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
-      await request.text(),
+    const body = await request.text();
+    event = await stripe.webhooks.constructEventAsync(
+      body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err) {
-    console.error(err);
+    console.error("Webhook verification failed:", err);
     return new Response("Webhook Error", { status: 400 });
   }
 

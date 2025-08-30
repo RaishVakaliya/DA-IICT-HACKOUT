@@ -196,12 +196,25 @@ export const processWithdrawal = internalMutation({
     if (!request) throw new Error("Request not found");
 
     // Update the request status
-    await ctx.db.patch(requestId, { status: outcome, processedAt: Date.now() });
+    await ctx.db.patch(requestId, { 
+      status: outcome, 
+      processedAt: Date.now() 
+    });
 
-    // If processed, mark credits as retired. If failed, mark them as active again.
-    const newStatus = outcome === "processed" ? "retired" : "active";
+    // Update credit statuses based on outcome
     for (const creditId of request.creditIds) {
-      await ctx.db.patch(creditId, { status: newStatus });
+      if (outcome === "processed") {
+        // Success: retire credits (deduct from wallet)
+        await ctx.db.patch(creditId, { 
+          status: "retired",
+          retirementDate: Date.now(),
+        });
+      } else {
+        // Failure: return credits to active status (back in wallet)
+        await ctx.db.patch(creditId, { 
+          status: "active" 
+        });
+      }
     }
   },
 });

@@ -175,14 +175,6 @@ const HomePage = () => {
               Issue, track, and retire verifiable green hydrogen credits with complete transparency, 
               auditability, and tamper-resistance on the blockchain.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-white text-blue-900 hover:bg-white/90 shadow-lg px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95">
-                🎯 Open Dashboard
-              </button>
-              <button className="border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95">
-                View Registry 🔗
-              </button>
-            </div>
           </div>
         </div>
       </section>
