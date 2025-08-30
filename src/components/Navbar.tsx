@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SignInButton, SignUp } from "@clerk/clerk-react";
+import { SignInButton } from "@clerk/clerk-react";
+import { SignOutButton } from "@clerk/clerk-react";
+import { Authenticated, Unauthenticated } from "convex/react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -40,35 +42,23 @@ const Navbar = () => {
             >
               About
             </Link>
+            {/* Show Sign In when user is not logged in */}
+            <Unauthenticated>
+              <SignInButton mode="modal">
+                <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                  Sign In
+                </button>
+              </SignInButton>
+            </Unauthenticated>
 
-            {/* Clerk Sign In */}
-            <SignInButton mode="modal">
-              <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
-                Sign In
-              </button>
-            </SignInButton>
-            {/* ✅ Sign Up Modal with Role Dropdown */}
-      <SignUp
-        path="/sign-up"
-        routing="path"
-        signInUrl="/sign-in"
-        appearance={{
-          elements: {
-            formFieldInput: "rounded-lg border p-2",
-          },
-        }}
-        signUpField={[
-          {
-            name: "role",
-            label: "Select your role",
-            type: "select",
-            options: [
-              { value: "customer", label: "Customer" },
-              { value: "owner", label: "Owner" },
-            ],
-          },
-        ]}
-      />
+            {/* Show Logout when user is logged in */}
+            <Authenticated>
+              <SignOutButton>
+                <button className="px-4 py-2 bg-red-600 text-[#dae0e6] rounded-md hover:bg-red-700">
+                  Logout
+                </button>
+              </SignOutButton>
+            </Authenticated>
           </div>
 
           {/* Mobile Menu Toggle */}
