@@ -128,3 +128,40 @@ export const getUserByClerkId = query({
     return user;
   },
 });
+
+export const updateUser = mutation({
+  args: {
+    clerkId: v.string(),
+    fullname: v.optional(v.string()),
+    username: v.optional(v.string()),
+    image: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    organization: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Get the authenticated user
+    const currentUser = await getAuthenticatedUser(ctx);
+    
+    // Verify the user is updating their own profile
+    if (currentUser.clerkId !== args.clerkId) {
+      throw new Error("Unauthorized: Can only update own profile");
+    }
+
+    // Prepare update object with only provided fields
+    const updateData: any = {};
+    if (args.fullname !== undefined) updateData.fullname = args.fullname;
+    if (args.username !== undefined) updateData.username = args.username;
+    if (args.image !== undefined) updateData.image = args.image;
+    if (args.phone !== undefined) updateData.phone = args.phone;
+    if (args.organization !== undefined) updateData.organization = args.organization;
+
+    // Update the user
+    await ctx.db.patch(currentUser._id, updateData);
+
+    // Return the updated user
+    return await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+  },
+});

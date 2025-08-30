@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import { SignOutButton } from "@clerk/clerk-react";
 import { useAuth } from "@clerk/clerk-react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,13 +12,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ProfilePage = () => {
   const { user, isLoading } = useUser();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Convex mutation for updating user
+  const updateUser = useMutation(api.users.updateUser);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     fullname: user?.fullname || "",
     username: user?.username || "",
     image: user?.image || "",
+    phone: user?.phone || "",
   });
   const [imagePreview, setImagePreview] = useState(user?.image || "");
 
@@ -67,11 +73,25 @@ const ProfilePage = () => {
   };
 
   const handleSave = async () => {
+    if (!userId) return;
+    
     setIsSaving(true);
-    // TODO: Implement update user mutation
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-    setIsSaving(false);
-    setIsEditDialogOpen(false);
+    try {
+      await updateUser({
+        clerkId: userId,
+        fullname: formData.fullname,
+        username: formData.username,
+        image: formData.image,
+        phone: formData.phone,
+      });
+      setIsEditDialogOpen(false);
+      // TODO: Refresh user data or show success message
+    } catch (error) {
+      console.error("Error updating user:", error);
+      // TODO: Show error message to user
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -79,6 +99,7 @@ const ProfilePage = () => {
       fullname: user?.fullname || "",
       username: user?.username || "",
       image: user?.image || "",
+      phone: user?.phone || "",
     });
     setImagePreview(user?.image || "");
     setIsEditDialogOpen(false);
@@ -167,20 +188,34 @@ const ProfilePage = () => {
                       />
                     </div>
 
-                    {/* Username */}
-                    <div className="space-y-2">
-                      <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
-                      <Input
-                        id="username"
-                        name="username"
-                        type="text"
-                        placeholder="Enter username"
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
+                                         {/* Username */}
+                     <div className="space-y-2">
+                       <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
+                       <Input
+                         id="username"
+                         name="username"
+                         type="text"
+                         placeholder="Enter username"
+                         value={formData.username}
+                         onChange={handleInputChange}
+                         className="w-full"
+                       />
+                     </div>
+
+                     {/* Phone Number */}
+                     <div className="space-y-2">
+                       <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
+                       <Input
+                         id="phone"
+                         name="phone"
+                         type="tel"
+                         placeholder="Enter your phone number"
+                         value={formData.phone}
+                         onChange={handleInputChange}
+                         className="w-full"
+                       />
+                     </div>
+                   </div>
 
                   <div className="flex gap-3 pt-4">
                     <Button 
@@ -271,6 +306,14 @@ const ProfilePage = () => {
                   <p className="text-lg font-semibold text-gray-900">{user?.email}</p>
                 </div>
                 <span className="text-2xl">📧</span>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Phone Number</p>
+                  <p className="text-lg font-semibold text-gray-900">{user?.phone || "Not set"}</p>
+                </div>
+                <span className="text-2xl">📱</span>
               </div>
             </div>
           </div>
