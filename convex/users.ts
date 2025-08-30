@@ -50,6 +50,9 @@ export const syncUser = internalMutation({
       fullname: args.fullname,
       username: args.username,
       image: args.image,
+      role: args.role || "buyer", // Default role
+      posts: 0, // Initialize posts count
+      searchable: true, // Default to searchable
     });
 
     return userId;
@@ -63,6 +66,15 @@ export const createUser = mutation({
     fullname: v.string(),
     username: v.string(),
     image: v.optional(v.string()),
+    role: v.optional(
+      v.union(
+        v.literal("producer"),
+        v.literal("certifier"),
+        v.literal("buyer"),
+        v.literal("regulator"),
+        v.literal("auditor")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     // Check if user already exists
@@ -82,6 +94,9 @@ export const createUser = mutation({
       fullname: args.fullname,
       username: args.username,
       image: args.image,
+      role: args.role || "buyer", // Default role
+      posts: 0, // Initialize posts count
+      searchable: true, // Default to searchable
     });
 
     return userId;

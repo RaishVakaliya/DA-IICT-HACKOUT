@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SignInButton } from "@clerk/clerk-react";
-import { SignOutButton } from "@clerk/clerk-react";
 import { Authenticated, Unauthenticated } from "convex/react";
+import { useUser } from "../context/UserContext";
+import { useAuth } from "@clerk/clerk-react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, isLoading } = useUser();
+  const { isSignedIn } = useAuth();
 
   return (
     <nav className="bg-white shadow-md fixed w-full top-0 left-0 z-20">
@@ -42,6 +45,7 @@ const Navbar = () => {
             >
               About
             </Link>
+            
             {/* Show Sign In when user is not logged in */}
             <Unauthenticated>
               <SignInButton mode="modal">
@@ -51,13 +55,31 @@ const Navbar = () => {
               </SignInButton>
             </Unauthenticated>
 
-            {/* Show Logout when user is logged in */}
+            {/* Show User Profile when logged in */}
             <Authenticated>
-              <SignOutButton>
-                <button className="px-4 py-2 bg-red-600 text-[#dae0e6] rounded-md hover:bg-red-700">
-                  Logout
-                </button>
-              </SignOutButton>
+              {!isLoading && user && (
+                <Link
+                  to="/profile"
+                  className="flex items-center space-x-3 hover:bg-gray-100 px-3 py-2 rounded-md transition-colors"
+                >
+                  <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center">
+                    {user.image ? (
+                      <img
+                        src={user.image}
+                        alt="Profile"
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm text-white font-bold">
+                        {user.fullname?.charAt(0) || "U"}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-gray-900 font-medium">
+                    {user.fullname || user.username || "User"}
+                  </span>
+                </Link>
+              )}
             </Authenticated>
           </div>
 
@@ -118,11 +140,27 @@ const Navbar = () => {
             >
               About
             </Link>
-            <SignInButton mode="modal">
-              <button className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium">
-                Sign In
-              </button>
-            </SignInButton>
+            
+            {/* Mobile Profile Link */}
+            <Authenticated>
+              {!isLoading && user && (
+                <Link
+                  to="/profile"
+                  className="block px-3 py-2 text-base font-medium text-gray-900 hover:bg-gray-50"
+                >
+                  Profile
+                </Link>
+              )}
+            </Authenticated>
+            
+            {/* Mobile Sign In */}
+            <Unauthenticated>
+              <SignInButton mode="modal">
+                <button className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium">
+                  Sign In
+                </button>
+              </SignInButton>
+            </Unauthenticated>
           </div>
         </div>
       )}

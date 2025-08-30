@@ -45,21 +45,36 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         if (convexUser === null) {
-          // User doesn't exist in Convex
-          // If we were previously signed in but now the user is null,
-          // it might mean the user was deleted
-          if (user !== null) {
-            // User was deleted, sign out from Clerk
-            window.Clerk?.signOut();
+          // User doesn't exist in Convex, create them
+          try {
+            const newUserId = await createUser({
+              clerkId: userId,
+              email: clerkUser.emailAddresses[0]?.emailAddress || "",
+              fullname: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "User",
+              username: clerkUser.username || `user_${Date.now()}`,
+              image: clerkUser.imageUrl,
+            });
+            
+            // Set a temporary user object while we wait for the query to update
+            setUser({
+              _id: newUserId,
+              clerkId: userId,
+              email: clerkUser.emailAddresses[0]?.emailAddress || "",
+              fullname: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "User",
+              username: clerkUser.username || `user_${Date.now()}`,
+              image: clerkUser.imageUrl,
+              role: "buyer", // Default role
+              posts: 0, // Default posts count
+              searchable: true, // Default to searchable
+            });
+          } catch (createError) {
+            console.error("Error creating user:", createError);
+            setError("Failed to create user profile");
           }
-          
-          setUser(null);
-          setIsLoading(false);
-          return;
+        } else {
+          // User exists in Convex
+          setUser(convexUser);
         }
-
-        // User exists in Convex
-        setUser(convexUser);
       } catch (error) {
         console.error("Error syncing user:", error);
         setError(error instanceof Error ? error.message : "Failed to sync user");
