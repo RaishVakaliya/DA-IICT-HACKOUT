@@ -17,15 +17,28 @@ export const pay = action({
         if (!user) {
             throw new Error("User not found");
         }
-        const stripe = new Stripe(process.env.STRIPE_KEY!, {
-            apiVersion: "2024-06-20",
-        });
+        const stripe = new Stripe(process.env.STRIPE_KEY!);
+
+        let customerId = user.stripeCustomerId;
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                name: user.fullname,
+                email: user.email,
+                metadata: {
+                    userId: user._id,
+                },
+            });
+            customerId = customer.id;
+            await ctx.runMutation(internal.users.setStripeCustomerId, {
+                userId: user._id,
+                stripeCustomerId: customerId,
+            });
+        }
 
         const domain = process.env.HOSTING_URL ?? "http://localhost:5173";
 
-                const session = await stripe.checkout.sessions.create({
-            customer: user.stripeCustomerId,
-            automatic_payment_methods: { enabled: true },
+        const session = await stripe.checkout.sessions.create({
+            customer: customerId,
             line_items: [
                 {
                     price_data: {
@@ -43,7 +56,7 @@ export const pay = action({
             cancel_url: `${domain}/`,
             metadata: {
                 userId: user._id,
-                credits: credits.toString(),
+                credits: credits.toString(), // Convert credits to string for metadata
             },
         });
 
@@ -66,9 +79,7 @@ export const createStripeAccountLink = action({
             throw new Error("User not found");
         }
 
-        const stripe = new Stripe(process.env.STRIPE_KEY!, {
-            apiVersion: "2024-06-20",
-        });
+        const stripe = new Stripe(process.env.STRIPE_KEY!);
 
         const domain = process.env.HOSTING_URL ?? "http://localhost:5173";
 

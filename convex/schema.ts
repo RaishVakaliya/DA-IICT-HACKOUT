@@ -25,6 +25,7 @@ export default defineSchema({
     posts: v.optional(v.number()), // number of posts
     searchable: v.optional(v.boolean()), // whether user can be searched
     stripeAccountId: v.optional(v.string()), // For Stripe Connect payouts
+    stripeCustomerId: v.optional(v.string()), // For Stripe Checkout
   }).index("by_clerk_id", ["clerkId"]),
 
 

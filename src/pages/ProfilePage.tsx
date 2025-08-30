@@ -75,7 +75,7 @@ const ProfilePage = () => {
 
   const handleSave = async () => {
     if (!userId) return;
-    
+
     setIsSaving(true);
     try {
       await updateUser({
@@ -133,7 +133,7 @@ const ProfilePage = () => {
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{user?.fullname || "User"}</h1>
             <p className="text-xl text-sky-100 mb-6">{user?.username || "username"}</p>
             <p className="text-lg text-sky-100 mb-8">{user?.email}</p>
-            
+
             <div className="flex flex-wrap justify-center gap-4">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>
@@ -148,7 +148,7 @@ const ProfilePage = () => {
                       Update your profile information and image.
                     </DialogDescription>
                   </DialogHeader>
-                  
+
                   <div className="space-y-6 py-4">
                     {/* Profile Image Section */}
                     <div className="space-y-3">
@@ -162,7 +162,7 @@ const ProfilePage = () => {
                         onChange={handleInputChange}
                         className="w-full"
                       />
-                      
+
                       {/* Image Preview */}
                       {imagePreview && (
                         <div className="text-center">
@@ -189,38 +189,38 @@ const ProfilePage = () => {
                       />
                     </div>
 
-                                         {/* Username */}
-                     <div className="space-y-2">
-                       <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
-                       <Input
-                         id="username"
-                         name="username"
-                         type="text"
-                         placeholder="Enter username"
-                         value={formData.username}
-                         onChange={handleInputChange}
-                         className="w-full"
-                       />
-                     </div>
+                    {/* Username */}
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
+                      <Input
+                        id="username"
+                        name="username"
+                        type="text"
+                        placeholder="Enter username"
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        className="w-full"
+                      />
+                    </div>
 
-                     {/* Phone Number */}
-                     <div className="space-y-2">
-                       <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
-                       <Input
-                         id="phone"
-                         name="phone"
-                         type="tel"
-                         placeholder="Enter your phone number"
-                         value={formData.phone}
-                         onChange={handleInputChange}
-                         className="w-full"
-                       />
-                     </div>
-                   </div>
+                    {/* Phone Number */}
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
 
                   <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handleSave} 
+                    <Button
+                      onClick={handleSave}
                       disabled={isSaving}
                       className="flex-1 bg-sky-600 hover:bg-sky-700"
                     >
@@ -233,8 +233,8 @@ const ProfilePage = () => {
                         'Save Changes'
                       )}
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={handleCancel}
                       disabled={isSaving}
                       className="flex-1"
@@ -283,7 +283,7 @@ const ProfilePage = () => {
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-gray-50 rounded-xl">
                 <div className="flex items-center gap-3">
@@ -335,7 +335,7 @@ const ProfilePage = () => {
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Account Information</h2>
             </div>
-            
+
             <div className="space-y-6">
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
@@ -348,9 +348,8 @@ const ProfilePage = () => {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Verification Status</p>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    user?.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${user?.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
                     {user?.verified ? '✅ Verified' : '⏳ Pending Verification'}
                   </span>
                 </div>
@@ -381,7 +380,7 @@ const ProfilePage = () => {
 
           <div className="space-y-4">
             {transactions && transactions.length > 0 ? (
-              transactions.map((tx) => (
+              [...new Map(transactions.map(tx => [tx._id, tx])).values()].map((tx) => (
                 <div key={tx._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div>
                     <p className="text-lg font-semibold text-gray-900 capitalize">

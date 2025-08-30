@@ -225,3 +225,12 @@ export const getMyUser = internalQuery({
     return user;
   },
 });
+
+export const setStripeCustomerId = internalMutation({
+    args: { userId: v.id("users"), stripeCustomerId: v.string() },
+    handler: async (ctx, { userId, stripeCustomerId }) => {
+        await ctx.db.patch(userId, {
+            stripeCustomerId: stripeCustomerId,
+        });
+    },
+});
