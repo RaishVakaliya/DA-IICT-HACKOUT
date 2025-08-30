@@ -3,16 +3,13 @@ import { Link, useLocation } from "react-router-dom";
 import { SignInButton } from "@clerk/clerk-react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { useUser } from "../context/UserContext";
-import { useAuth } from "@clerk/clerk-react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, isLoading } = useUser();
-  const { isSignedIn } = useAuth();
   const location = useLocation();
 
   const navItems = [
-    { name: "Home", path: "/" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Certification", path: "/certification" },
     { name: "About", path: "/about" }
