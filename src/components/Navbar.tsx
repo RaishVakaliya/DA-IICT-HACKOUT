@@ -1,12 +1,41 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { SignInButton } from "@clerk/clerk-react";
-import { Authenticated, Unauthenticated } from "convex/react";
+import { Authenticated, Unauthenticated, useConvexAuth } from "convex/react";
 import { useUser } from "../context/UserContext";
+
+// Custom RotateLoader component
+const RotateLoader = ({ color = "#059669", size = 8, speedMultiplier = 1 }) => (
+  <div className="animate-spin">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="31.416"
+        strokeDashoffset="31.416"
+        className="animate-ping"
+        style={{
+          animationDuration: `${1 / speedMultiplier}s`,
+        }}
+      />
+    </svg>
+  </div>
+);
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isLoading } = useUser();
+  const { user: currentUser } = useUser();
+  const { isLoading } = useConvexAuth();
   const location = useLocation();
 
   const navItems = [
@@ -30,9 +59,16 @@ const Navbar = () => {
           {/* Logo */}
           <Link
             to="/"
-            className="text-2xl font-bold text-emerald-600 hover:text-emerald-700 transition-all duration-300 transform hover:scale-105"
+            className="flex items-center space-x-3 hover:scale-105 transition-all duration-300 transform"
           >
-            HyDit
+            <img
+              src="/logo.jpg"
+              alt="HyDit Logo"
+              className="w-10 h-10 rounded-lg object-cover shadow-md"
+            />
+            <span className="text-2xl font-bold text-emerald-600 hover:text-emerald-700 transition-colors duration-300">
+              HyDit
+            </span>
           </Link>
 
           {/* Desktop Navigation - Centered */}
@@ -73,26 +109,34 @@ const Navbar = () => {
 
             {/* Show User Profile when logged in */}
             <Authenticated>
-              {!isLoading && user && (
+              {isLoading ? (
+                // Loading state with RotateLoader
+                <div className="flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                  <RotateLoader color="#059669" size={10} speedMultiplier={1} />
+                  <span className="text-gray-600 text-sm font-medium">
+                    Loading profile...
+                  </span>
+                </div>
+              ) : currentUser ? (
                 <Link
                   to="/profile"
                   className="flex items-center space-x-3 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-md active:scale-95 group"
                 >
                   <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center group-hover:bg-emerald-700 transition-colors duration-300 shadow-md group-hover:shadow-lg">
-                    {user.image ? (
+                    {currentUser.image ? (
                       <img
-                        src={user.image}
+                        src={currentUser.image}
                         alt="Profile"
                         className="w-8 h-8 rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-sm text-white font-bold">
-                        {user.fullname?.charAt(0) || "U"}
+                        {currentUser.fullname?.charAt(0) || "U"}
                       </span>
                     )}
                   </div>
                   <span className="text-gray-900 font-medium group-hover:text-emerald-600 transition-colors duration-300">
-                    {user.fullname || user.username || "User"}
+                    {currentUser.fullname || currentUser.username || "User"}
                   </span>
                   {/* Hover arrow indicator */}
                   <svg
@@ -109,6 +153,14 @@ const Navbar = () => {
                     />
                   </svg>
                 </Link>
+              ) : (
+                // Fallback when user is authenticated but no user data
+                <div className="flex items-center space-x-3 px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <RotateLoader color="#d97706" size={8} speedMultiplier={1} />
+                  <span className="text-yellow-700 text-sm font-medium">
+                    Setting up profile...
+                  </span>
+                </div>
               )}
             </Authenticated>
           </div>
@@ -145,6 +197,22 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200 shadow-lg">
+          {/* Mobile Logo Header */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <Link
+              to="/"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center space-x-3"
+            >
+              <img
+                src="/logo.jpg"
+                alt="HyDit Logo"
+                className="w-8 h-8 rounded-lg object-cover shadow-md"
+              />
+              <span className="text-xl font-bold text-emerald-600">HyDit</span>
+            </Link>
+          </div>
+
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => (
               <Link
@@ -163,7 +231,16 @@ const Navbar = () => {
 
             {/* Mobile Profile Link */}
             <Authenticated>
-              {!isLoading && user && (
+              {isLoading ? (
+                <div className="flex items-center space-x-3 px-4 py-3">
+                  <RotateLoader
+                    color="#059669"
+                    size={6}
+                    speedMultiplier={0.8}
+                  />
+                  <span className="text-gray-500 text-sm">Loading...</span>
+                </div>
+              ) : currentUser ? (
                 <Link
                   to="/profile"
                   onClick={() => setIsMenuOpen(false)}
@@ -171,7 +248,7 @@ const Navbar = () => {
                 >
                   Profile
                 </Link>
-              )}
+              ) : null}
             </Authenticated>
 
             {/* Mobile Sign In */}

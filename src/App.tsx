@@ -2,13 +2,13 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import NavBar from "./components/Navbar";
-import HomePage from "./components/HomePage";
-import ProfilePage from "./components/ProfilePage";
-import MarketplacePage from "./components/MarketplacePage";
-import CertificationPage from "./components/CertificationPage";
-import AboutPage from "./components/AboutPage";
+import HomePage from "./pages/HomePage";
+import ProfilePage from "./pages/ProfilePage";
+import MarketplacePage from "./pages/MarketplacePage";
+import CertificationPage from "./pages/CertificationPage";
+import AboutPage from "./pages/AboutPage";
 import Footer from "./components/Footer";
-import Registry from "./components/Registry";
+import Registry from "./pages/Registry";
 
 function App() {
   return (

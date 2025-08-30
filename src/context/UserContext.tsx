@@ -46,6 +46,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (convexUser === null) {
           // User doesn't exist in Convex, create them
+          setIsLoading(true);
           try {
             const newUserId = await createUser({
               clerkId: userId,
@@ -67,24 +68,26 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               posts: 0, // Default posts count
               searchable: true, // Default to searchable
             });
+            setIsLoading(false);
           } catch (createError) {
             console.error("Error creating user:", createError);
             setError("Failed to create user profile");
+            setIsLoading(false);
           }
         } else {
           // User exists in Convex
           setUser(convexUser);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("Error syncing user:", error);
         setError(error instanceof Error ? error.message : "Failed to sync user");
-      } finally {
         setIsLoading(false);
       }
     };
 
     syncUser();
-  }, [isSignedIn, userId, convexUser, createUser, clerkUser, isClerkUserLoaded, user]);
+  }, [isSignedIn, userId, convexUser, createUser, clerkUser, isClerkUserLoaded]);
 
   return (
     <UserContext.Provider value={{ user, isLoading, error }}>
