@@ -115,15 +115,18 @@ export const createUser = mutation({
 
 export async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Unauthorized");
+  if (!identity) {
+    // Return null if there's no authenticated user
+    return null;
+  }
 
   const currentUser = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
     .first();
 
-  if (!currentUser) throw new Error("User not found");
-
+  // Return the user if found, otherwise null.
+  // This handles cases where the user exists in Clerk but hasn't been synced to the Convex DB yet.
   return currentUser;
 }
 
@@ -136,6 +139,9 @@ export const getCurrentUser = query({
 export const isCertifierOrAdmin = query({
   handler: async (ctx) => {
     const user = await getAuthenticatedUser(ctx);
+    if (!user) {
+      return false;
+    }
     const adminClerkId = process.env.ADMIN_CLERK_ID;
     return (
       user.role === "certifier" ||
@@ -147,14 +153,8 @@ export const isCertifierOrAdmin = query({
 
 export const isAdminUser = query({
   handler: async (ctx) => {
-    try {
-      const user = await getAuthenticatedUser(ctx);
-      return user.role === "admin";
-    } catch (error) {
-      // If getAuthenticatedUser throws an error (e.g., user not found or not authenticated),
-      // they are not an admin.
-      return false;
-    }
+    const user = await getAuthenticatedUser(ctx);
+    return user?.role === "admin";
   },
 });
 
@@ -207,6 +207,10 @@ export const updateUser = mutation({
     // Get the authenticated user
     const currentUser = await getAuthenticatedUser(ctx);
 
+    if (!currentUser) {
+      throw new Error("User not found");
+    }
+
     // Verify the user is updating their own profile
     if (currentUser.clerkId !== args.clerkId) {
       throw new Error("Unauthorized: Can only update own profile");
@@ -237,16 +241,12 @@ export const setTransactionPin = mutation({
     hashedPin: v.string(),
   },
   handler: async (ctx, args) => {
-    try {
-      const currentUser = await getAuthenticatedUser(ctx);
-      await ctx.db.patch(currentUser._id, { transactionPin: args.hashedPin });
-      return { success: true, message: "Transaction PIN set successfully." };
-    } catch (error) {
-      console.error("Error in setTransactionPin mutation:", error);
-      throw new Error(
-        `Failed to set transaction PIN: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+    const currentUser = await getAuthenticatedUser(ctx);
+    if (!currentUser) {
+      throw new Error("User not found");
     }
+    await ctx.db.patch(currentUser._id, { transactionPin: args.hashedPin });
+    return { success: true, message: "Transaction PIN set successfully." };
   },
 });
 
@@ -364,6 +364,9 @@ export const setStripeCustomerId = internalMutation({
 export const getMyProducerApplication = query({
   handler: async (ctx) => {
     const currentUser = await getAuthenticatedUser(ctx);
+    if (!currentUser) {
+      return null;
+    }
 
     const application = await ctx.db
       .query("producer_applications")
@@ -393,6 +396,9 @@ export const submitProducerApplication = mutation({
   },
   handler: async (ctx, { producerDetails, documents }) => {
     const currentUser = await getAuthenticatedUser(ctx);
+    if (!currentUser) {
+      throw new Error("User not found");
+    }
 
     // Check if there's an existing pending or approved application for this user
     const existingApplication = await ctx.db
@@ -573,10 +579,15 @@ export const updateProducerApplicationStatus = internalMutation({
     if (!application) throw new Error("Application not found.");
 
     // Update the application status in producer_applications table
+    const reviewer = await getAuthenticatedUser(ctx);
+    if (!reviewer) {
+      throw new Error("Reviewer not found");
+    }
+
     await ctx.db.patch(applicationId, {
       status,
       reviewNotes,
-      reviewedBy: (await getAuthenticatedUser(ctx))._id, // Assuming admin is authenticated
+      reviewedBy: reviewer._id, // Assuming admin is authenticated
       reviewedAt: Date.now(),
     });
 
@@ -605,10 +616,15 @@ export const updateWithdrawalRequestStatus = mutation({
     if (!request) throw new Error("Request not found");
 
     // Update the request status
+    const reviewer = await getAuthenticatedUser(ctx);
+    if (!reviewer) {
+      throw new Error("Reviewer not found");
+    }
+
     await ctx.db.patch(args.requestId, { 
       status: args.status, 
       processedAt: Date.now(),
-      reviewedBy: (await getAuthenticatedUser(ctx))._id,
+      reviewedBy: reviewer._id,
       reviewNotes: args.reviewNotes,
     });
 
