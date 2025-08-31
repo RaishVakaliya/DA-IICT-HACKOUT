@@ -164,7 +164,7 @@ export const getUserByClerkId = query({
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+      .first();
 
     return user;
   },
