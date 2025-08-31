@@ -16,7 +16,8 @@ export default defineSchema({
         v.literal("certifier"),
         v.literal("buyer"),
         v.literal("regulator"),
-        v.literal("auditor")
+        v.literal("auditor"),
+        v.literal("admin")
       )
     ), // user role in HyDit
     walletAddress: v.optional(v.string()), // MetaMask wallet
@@ -150,6 +151,8 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("processed"), v.literal("failed")),
     processedAt: v.optional(v.number()),
     stripeTransferId: v.optional(v.string()), // To track payout transfer
+    reviewNotes: v.optional(v.string()), // Notes from admin review
+    reviewedBy: v.optional(v.id("users")),
   }).index("by_userId", ["userId"]),
 
   // Hydrogen Listings table
