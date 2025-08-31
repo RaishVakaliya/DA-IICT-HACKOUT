@@ -1,102 +1,45 @@
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Loader2 } from "lucide-react";
 
 const Registry = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [energyFilter, setEnergyFilter] = useState("all");
 
-  // Clean, relevant data for HyDit platform
-  const certificates = [
-    {
-      id: "HYDIT-001",
-      tokenId: "GH001",
-      producer: "EcoHydro Solutions",
-      volume: "1,250",
-      energySource: "Solar + Wind",
-      productionDate: "2024-01-15",
-      verificationDate: "2024-01-18",
-      status: "VERIFIED",
-      verifier: "HyDit Certifiers",
-      txHash: "0x1a2b3c4d5e6f7890abcdef1234567890abcdef12",
-      ipfsCid: "QmXoYpYz4K9R8vMnPqFe2wQxTr7UvBc6NmHgJkLpOiU8hV",
-      creditsMinted: "1,250",
-      location: "California, USA",
-      carbonIntensity: "2.1 kg CO2/kg H2",
-    },
-    {
-      id: "HYDIT-002",
-      tokenId: "GH002",
-      producer: "Nordic Green Hydrogen",
-      volume: "850",
-      energySource: "Hydroelectric",
-      productionDate: "2024-01-12",
-      verificationDate: "2024-01-16",
-      status: "VERIFIED",
-      verifier: "HyDit Certifiers",
-      txHash: "0x2b3c4d5e6f7890abcdef1234567890abcdef123a",
-      ipfsCid: "QmYpZq5K9R8vMnPqFe2wQxTr7UvBc6NmHgJkLpOiU8hW",
-      creditsMinted: "850",
-      location: "Norway",
-      carbonIntensity: "1.8 kg CO2/kg H2",
-    },
-    {
-      id: "HYDIT-003",
-      tokenId: "GH003",
-      producer: "Australian Solar H2",
-      volume: "2,100",
-      energySource: "Solar",
-      productionDate: "2024-01-10",
-      verificationDate: null,
-      status: "PENDING",
-      verifier: "HyDit Certifiers",
-      txHash: null,
-      ipfsCid: "QmZqAr6K9R8vMnPqFe2wQxTr7UvBc6NmHgJkLpOiU8hX",
-      creditsMinted: "0",
-      location: "Queensland, Australia",
-      carbonIntensity: "2.3 kg CO2/kg H2",
-    },
-    {
-      id: "HYDIT-004",
-      tokenId: "GH004",
-      producer: "WindHydro Corp",
-      volume: "750",
-      energySource: "Wind",
-      productionDate: "2024-01-08",
-      verificationDate: "2024-01-20",
-      status: "VERIFIED",
-      verifier: "HyDit Certifiers",
-      txHash: "0x3c4d5e6f7890abcdef1234567890abcdef123a2b",
-      ipfsCid: "QmArBs7K9R8vMnPqFe2wQxTr7UvBc6NmHgJkLpOiU8hY",
-      creditsMinted: "750",
-      location: "Texas, USA",
-      carbonIntensity: "1.9 kg CO2/kg H2",
-    },
-  ];
+  const publicListings = useQuery(api.hydrogen_listings.getPublicListings);
 
-  const statusConfig = {
-    VERIFIED: {
+  // Re-map listings to fit 'certificate' structure if needed for UI, or adjust UI directly
+  // For now, let's adjust the UI directly to use listing properties
+
+  const statusConfig: { [key: string]: { color: string; icon: string; label: string } } = {
+    active: {
       color: "bg-emerald-100 text-emerald-800 border-emerald-200",
       icon: "✓",
-      label: "Verified",
+      label: "Active",
     },
-    PENDING: {
+    inactive: {
       color: "bg-yellow-100 text-yellow-800 border-yellow-200",
       icon: "⏳",
-      label: "Pending",
+      label: "Inactive",
     },
-    REVOKED: {
+    sold_out: {
       color: "bg-red-100 text-red-800 border-red-200",
       icon: "✗",
-      label: "Revoked",
+      label: "Sold Out",
     },
   };
 
-  const filteredCertificates = certificates.filter((cert) => {
+  const filteredCertificates = publicListings?.filter((cert: any) => {
     const matchesSearch =
-      cert.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.producer.toLowerCase().includes(searchTerm.toLowerCase());
+      (cert.producerDetails?.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cert.producerDetails?.username
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase())) &&
+      cert.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      statusFilter === "all" || cert.status === statusFilter;
+      statusFilter === "all" || cert.listingStatus === statusFilter;
     const matchesEnergy =
       energyFilter === "all" ||
       cert.energySource.toLowerCase().includes(energyFilter.toLowerCase());
@@ -104,17 +47,19 @@ const Registry = () => {
     return matchesSearch && matchesStatus && matchesEnergy;
   });
 
-  const totalVolume = certificates.reduce(
-    (sum, cert) => sum + parseFloat(cert.volume.replace(/[^\d.]/g, "")),
-    0
-  );
-  const verifiedCount = certificates.filter(
-    (cert) => cert.status === "VERIFIED"
-  ).length;
-  const totalCredits = certificates.reduce(
-    (sum, cert) => sum + parseFloat(cert.creditsMinted),
-    0
-  );
+  const totalVolume =
+    filteredCertificates?.reduce(
+      (sum: any, cert: any) => sum + cert.quantityKg,
+      0
+    ) || 0;
+  const activeCount =
+    filteredCertificates?.filter((cert: any) => cert.listingStatus === "active")
+      .length || 0;
+  const totalHydcoinValue =
+    filteredCertificates?.reduce(
+      (sum: any, cert: any) => sum + cert.pricePerKg * cert.quantityKg,
+      0
+    ) || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 pt-20">
@@ -146,15 +91,15 @@ const Registry = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="text-center">
             <div className="text-4xl font-bold text-cyan-600 mb-2">
-              {certificates.length}
+              {publicListings?.length || 0}
             </div>
             <div className="text-gray-600">Total Certificates</div>
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-cyan-600 mb-2">
-              {verifiedCount}
+              {activeCount}
             </div>
-            <div className="text-gray-600">Verified</div>
+            <div className="text-gray-600">Active</div>
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-cyan-600 mb-2">
@@ -164,7 +109,7 @@ const Registry = () => {
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-cyan-600 mb-2">
-              {totalCredits.toLocaleString()}
+              {totalHydcoinValue.toLocaleString()}
             </div>
             <div className="text-gray-600">Credits Minted</div>
           </div>
@@ -196,9 +141,9 @@ const Registry = () => {
                 className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
-                <option value="VERIFIED">Verified</option>
-                <option value="PENDING">Pending</option>
-                <option value="REVOKED">Revoked</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="sold_out">Sold Out</option>
               </select>
               <select
                 value={energyFilter}
@@ -219,146 +164,149 @@ const Registry = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Certificates ({filteredCertificates.length})
+            Certificates ({filteredCertificates?.length || 0})
           </h2>
           <p className="text-gray-600">
             Browse all green hydrogen production certificates
           </p>
         </div>
 
-        <div className="space-y-6">
-          {filteredCertificates.map((cert) => {
-            const statusInfo =
-              statusConfig[cert.status as keyof typeof statusConfig];
+        {publicListings === undefined ? (
+          <div className="text-center py-8"><Loader2 className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" /><p className="text-gray-600">Loading certificates...</p></div>
+        ) : filteredCertificates?.length === 0 ? (
+          <p className="text-gray-600 text-center py-4">No certificates found matching your criteria.</p>
+        ) : (
+          <div className="space-y-6">
+            {filteredCertificates?.map((cert: any) => {
+              const statusInfo =
+                statusConfig[cert.listingStatus as keyof typeof statusConfig];
 
-            return (
-              <div
-                key={cert.id}
-                className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden"
-              >
-                <div className="p-6">
-                  <div className="grid gap-6 md:grid-cols-3">
-                    {/* Certificate Details */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900">
-                            {cert.id}
-                          </h3>
-                          <p className="text-gray-500">
-                            Token ID: {cert.tokenId}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-semibold border ${statusInfo.color}`}
-                        >
-                          {statusInfo.icon} {statusInfo.label}
-                        </span>
-                      </div>
+              if (!statusInfo) return null; // Fallback for unexpected status
 
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Producer:
-                          </span>
-                          <p className="text-gray-900">{cert.producer}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Volume:
-                          </span>
-                          <p className="text-gray-900">{cert.volume} kg</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Energy Source:
-                          </span>
-                          <p className="text-gray-900">{cert.energySource}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Location:
-                          </span>
-                          <p className="text-gray-900">{cert.location}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Carbon Intensity:
-                          </span>
-                          <p className="text-gray-900">
-                            {cert.carbonIntensity}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Verification Details */}
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-gray-900 text-lg">
-                        Verification Details
-                      </h4>
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Verifier:
-                          </span>
-                          <p className="text-gray-900">{cert.verifier}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Production Date:
-                          </span>
-                          <p className="text-gray-900">{cert.productionDate}</p>
-                        </div>
-                        {cert.verificationDate && (
+              return (
+                <div
+                  key={cert._id}
+                  className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="grid gap-6 md:grid-cols-3">
+                      {/* Certificate Details */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <span className="text-sm font-semibold text-gray-700">
-                              Verified Date:
-                            </span>
-                            <p className="text-gray-900">
-                              {cert.verificationDate}
+                            <h3 className="text-xl font-bold text-gray-900">
+                              {cert.producerDetails?.companyName || "N/A"}
+                            </h3>
+                            <p className="text-gray-500">
+                              Listing ID: {cert._id}
                             </p>
                           </div>
-                        )}
-                        <div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Credits Minted:
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-semibold border ${statusInfo.color}`}
+                          >
+                            {statusInfo.icon} {statusInfo.label}
                           </span>
-                          <p className="text-gray-900">{cert.creditsMinted}</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Producer:
+                            </span>
+                            <p className="text-gray-900">{cert.producerDetails?.fullname || "N/A"}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Volume:
+                            </span>
+                            <p className="text-gray-900">{cert.quantityKg} kg</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Energy Source:
+                            </span>
+                            <p className="text-gray-900">{cert.energySource}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Location:
+                            </span>
+                            <p className="text-gray-900">{cert.location}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Price per kg:
+                            </span>
+                            <p className="text-gray-900">{cert.pricePerKg} Hydcoin</p>
+                          </div>
+                          {cert.certificationDetails && (<div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Certification:
+                            </span>
+                            <p className="text-gray-900">{cert.certificationDetails}</p>
+                          </div>)}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Blockchain Links */}
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-gray-900 text-lg">
-                        Blockchain Proof
-                      </h4>
-                      <div className="space-y-3">
-                        {cert.txHash && (
-                          <button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                            <span>🔗</span>
-                            View Transaction
-                          </button>
-                        )}
-                        <button className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                          <span>📄</span>
-                          View Metadata (IPFS)
-                        </button>
-                        {cert.status === "VERIFIED" && (
-                          <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                            <span>📥</span>
-                            Download Certificate
-                          </button>
-                        )}
+                      {/* Verification Details - Adjust for listings */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-gray-900 text-lg">
+                          Listing Information
+                        </h4>
+                        <div className="space-y-3">
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Listed On:
+                            </span>
+                            <p className="text-gray-900">{new Date(cert.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Last Updated:
+                            </span>
+                            <p className="text-gray-900">{new Date(cert.updatedAt).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Total Value:
+                            </span>
+                            <p className="text-gray-900">{(cert.pricePerKg * cert.quantityKg).toLocaleString()} Hydcoin</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions/Links - Adjust for listings */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-gray-900 text-lg">
+                          Actions
+                        </h4>
+                        <div className="space-y-3">
+                          <a href={`/purchase/${cert._id}`} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                            <span>🛒</span>
+                            Purchase Listing
+                          </a>
+                          {cert.producerDetails && (
+                            <a href={`/profile/${cert.producerDetails._id}`}
+                               className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                              <span>👤</span>
+                              View Seller Profile
+                            </a>
+                          )}
+                          {cert.listingStatus === "active" && cert.producerDetails && (
+                            <a href={`/profile/${cert.producerDetails._id}`} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                              <span>✉️</span>
+                              Contact Seller
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Features Section */}

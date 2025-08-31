@@ -5,9 +5,11 @@ import {
   internalQuery,
   type QueryCtx,
   type MutationCtx,
+  action,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import * as bcrypt from "bcryptjs";
 
 export const syncUser = internalMutation({
   args: {
@@ -149,6 +151,30 @@ export const getUserByClerkId = query({
   },
 });
 
+export const getUserProfile = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+
+    if (!user) {
+      return null;
+    }
+
+    // Return only public information
+    return {
+      _id: user._id,
+      username: user.username,
+      fullname: user.fullname,
+      image: user.image,
+      organization: user.organization,
+      role: user.role, // Include role as it's part of the producer feature
+      // Add other public fields as needed
+    };
+  },
+});
+
 export const updateUser = mutation({
   args: {
     clerkId: v.string(),
@@ -161,7 +187,7 @@ export const updateUser = mutation({
   handler: async (ctx, args) => {
     // Get the authenticated user
     const currentUser = await getAuthenticatedUser(ctx);
-    
+
     // Verify the user is updating their own profile
     if (currentUser.clerkId !== args.clerkId) {
       throw new Error("Unauthorized: Can only update own profile");
@@ -173,7 +199,8 @@ export const updateUser = mutation({
     if (args.username !== undefined) updateData.username = args.username;
     if (args.image !== undefined) updateData.image = args.image;
     if (args.phone !== undefined) updateData.phone = args.phone;
-    if (args.organization !== undefined) updateData.organization = args.organization;
+    if (args.organization !== undefined)
+      updateData.organization = args.organization;
 
     // Update the user
     await ctx.db.patch(currentUser._id, updateData);
@@ -183,6 +210,60 @@ export const updateUser = mutation({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+  },
+});
+
+export const setTransactionPin = mutation({
+  args: {
+    hashedPin: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      const currentUser = await getAuthenticatedUser(ctx);
+      await ctx.db.patch(currentUser._id, { transactionPin: args.hashedPin });
+      return { success: true, message: "Transaction PIN set successfully." };
+    } catch (error) {
+      console.error("Error in setTransactionPin mutation:", error);
+      throw new Error(
+        `Failed to set transaction PIN: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  },
+});
+
+export const hashPin = action({
+  args: {
+    pin: v.string(),
+  },
+  handler: async (_, args) => {
+    return await bcrypt.hash(args.pin, 10);
+  },
+});
+
+export const getHashedPinForVerification = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    return user?.transactionPin || null;
+  },
+});
+
+export const verifyTransactionPin = action({
+  args: {
+    pin: v.string(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const hashedPin: string | null = await ctx.runQuery(
+      api.users.getHashedPinForVerification,
+      { userId: args.userId }
+    );
+    if (!hashedPin) {
+      return false;
+    }
+    return await bcrypt.compare(args.pin, hashedPin);
   },
 });
 
@@ -197,23 +278,23 @@ export const processWithdrawal = internalMutation({
     if (!request) throw new Error("Request not found");
 
     // Update the request status
-    await ctx.db.patch(requestId, { 
-      status: outcome, 
-      processedAt: Date.now() 
+    await ctx.db.patch(requestId, {
+      status: outcome,
+      processedAt: Date.now(),
     });
 
     // Update credit statuses based on outcome
     for (const creditId of request.creditIds) {
       if (outcome === "processed") {
         // Success: retire credits (deduct from wallet)
-        await ctx.db.patch(creditId, { 
+        await ctx.db.patch(creditId, {
           status: "retired",
           retirementDate: Date.now(),
         });
       } else {
         // Failure: return credits to active status (back in wallet)
-        await ctx.db.patch(creditId, { 
-          status: "active" 
+        await ctx.db.patch(creditId, {
+          status: "active",
         });
       }
     }
@@ -283,11 +364,13 @@ export const submitProducerApplication = mutation({
       contactPerson: v.string(),
       website: v.optional(v.string()),
     }),
-    documents: v.array(v.object({
-      type: v.string(),
-      url: v.string(),
-      uploadDate: v.number(),
-    })),
+    documents: v.array(
+      v.object({
+        type: v.string(),
+        url: v.string(),
+        uploadDate: v.number(),
+      })
+    ),
   },
   handler: async (ctx, { producerDetails, documents }) => {
     const currentUser = await getAuthenticatedUser(ctx);
@@ -305,10 +388,12 @@ export const submitProducerApplication = mutation({
       .first();
 
     if (existingApplication) {
-      throw new Error("An active producer application already exists for this user.");
+      throw new Error(
+        "An active producer application already exists for this user."
+      );
     }
 
-    const newDocuments = documents.map(doc => ({
+    const newDocuments = documents.map((doc) => ({
       ...doc,
       status: "pending" as "pending", // Initial status for new documents
     }));
@@ -320,7 +405,10 @@ export const submitProducerApplication = mutation({
       documents: newDocuments,
     });
 
-    return { success: true, message: "Producer application submitted successfully." };
+    return {
+      success: true,
+      message: "Producer application submitted successfully.",
+    };
   },
 });
 
@@ -329,7 +417,9 @@ export const getPendingProducerApplications = query({
     // Only allow administrators to call this query
     const isAdmin = await ctx.runQuery(api.users.isAdminUser);
     if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can view pending applications.");
+      throw new Error(
+        "Unauthorized: Only administrators can view pending applications."
+      );
     }
 
     const pendingApplications = await ctx.db
@@ -343,7 +433,14 @@ export const getPendingProducerApplications = query({
         const user = await ctx.db.get(app.userId);
         return {
           ...app,
-          user: user ? { _id: user._id, fullname: user.fullname, username: user.username, email: user.email } : null,
+          user: user
+            ? {
+                _id: user._id,
+                fullname: user.fullname,
+                username: user.username,
+                email: user.email,
+              }
+            : null,
         };
       })
     );
@@ -358,11 +455,16 @@ export const updateDocumentStatusPublic = mutation({
     documentIndex: v.number(),
     status: v.union(v.literal("verified"), v.literal("rejected")),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; message: string }> => {
     // Ensure the user is an admin before allowing the update
     const isAdmin = await ctx.runQuery(api.users.isAdminUser);
     if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can update document status.");
+      throw new Error(
+        "Unauthorized: Only administrators can update document status."
+      );
     }
     return await ctx.runMutation(internal.users.updateDocumentStatus, args);
   },
@@ -374,13 +476,21 @@ export const updateProducerApplicationStatusPublic = mutation({
     status: v.union(v.literal("approved"), v.literal("rejected")),
     reviewNotes: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; message: string }> => {
     // Ensure the user is an admin before allowing the update
     const isAdmin = await ctx.runQuery(api.users.isAdminUser);
     if (!isAdmin) {
-      throw new Error("Unauthorized: Only administrators can update application status.");
+      throw new Error(
+        "Unauthorized: Only administrators can update application status."
+      );
     }
-    return await ctx.runMutation(internal.users.updateProducerApplicationStatus, args);
+    return await ctx.runMutation(
+      internal.users.updateProducerApplicationStatus,
+      args
+    );
   },
 });
 
@@ -393,7 +503,8 @@ export const updateDocumentStatus = internalMutation({
   handler: async (ctx, { applicationId, documentIndex, status }) => {
     const application = await ctx.db.get(applicationId);
     if (!application) throw new Error("Application not found.");
-    if (!application.documents) throw new Error("Application has no documents.");
+    if (!application.documents)
+      throw new Error("Application has no documents.");
 
     const updatedDocuments = [...application.documents];
     if (documentIndex < 0 || documentIndex >= updatedDocuments.length) {

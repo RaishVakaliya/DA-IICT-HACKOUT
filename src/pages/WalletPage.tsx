@@ -212,7 +212,7 @@ const WithdrawalHistory = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              {withdrawalHistory.map((item) => {
+              {withdrawalHistory.map((item: any) => {
                 const status = StatusInfo[item.status] || { icon: Clock, color: 'text-gray-500', text: 'Unknown' };
                 return (
                   <tr key={item._id}>

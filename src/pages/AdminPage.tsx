@@ -122,7 +122,7 @@ const AdminPage = () => {
             <p className="text-center text-gray-500 dark:text-gray-400 py-8">No pending producer applications.</p>
           ) : (
             <div className="space-y-6">
-              {pendingProducerApplications.map((app) => (
+              {pendingProducerApplications.map((app: any) => (
                 <Card key={app._id} className="p-6 space-y-4 border-l-4 border-blue-500">
                   <div className="flex items-center justify-between">
                     <div>
@@ -195,7 +195,7 @@ const AdminPage = () => {
                   {app.documents && app.documents.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-lg font-semibold">Documents:</h3>
-                      {app.documents.map((doc, docIndex) => (
+                      {app.documents.map((doc: any, docIndex: any) => (
                         <div key={docIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-gray-600" />
@@ -252,7 +252,7 @@ const AdminPage = () => {
             <p className="text-center text-gray-500 dark:text-gray-400 py-8">No pending withdrawals.</p>
           ) : (
             <div className="space-y-4">
-              {pendingWithdrawals.map((req) => (
+              {pendingWithdrawals.map((req: any) => (
                 <Card key={req._id} className="flex items-center justify-between p-4">
                   <div>
                     <p className="font-semibold">{req.username}</p>
