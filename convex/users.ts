@@ -23,7 +23,7 @@ export const syncUser = internalMutation({
         v.literal("producer"),
         v.literal("certifier"),
         v.literal("buyer"),
-        v.literal("regulator"),
+        v.literal("regulator")
       )
     ),
   },
@@ -82,7 +82,7 @@ export const createUser = mutation({
         v.literal("producer"),
         v.literal("certifier"),
         v.literal("buyer"),
-        v.literal("regulator"),
+        v.literal("regulator")
       )
     ),
   },
@@ -228,11 +228,8 @@ export const updateUser = mutation({
     // Update the user
     await ctx.db.patch(currentUser._id, updateData);
 
-    // Return the updated user
-    return await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+    // Return a success message instead of re-querying
+    return { success: true };
   },
 });
 
@@ -330,7 +327,7 @@ export const getMyUser = internalQuery({
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+      .first();
 
     if (!user) {
       throw new Error("User not found");
@@ -349,7 +346,7 @@ export const setStripeCustomerId = internalMutation({
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+      .first();
 
     if (!user) {
       throw new Error("User not found");
@@ -530,7 +527,7 @@ export const assignRole = mutation({
       v.literal("producer"),
       v.literal("certifier"),
       v.literal("buyer"),
-      v.literal("regulator"),
+      v.literal("regulator")
     ),
   },
   handler: async (ctx, args) => {
@@ -621,8 +618,8 @@ export const updateWithdrawalRequestStatus = mutation({
       throw new Error("Reviewer not found");
     }
 
-    await ctx.db.patch(args.requestId, { 
-      status: args.status, 
+    await ctx.db.patch(args.requestId, {
+      status: args.status,
       processedAt: Date.now(),
       reviewedBy: reviewer._id,
       reviewNotes: args.reviewNotes,
@@ -633,18 +630,18 @@ export const updateWithdrawalRequestStatus = mutation({
       if (args.status === "processed") {
         // On success, the credits are effectively removed from circulation for this user
         // and handled by the external payout system. We mark them as 'withdrawn'.
-        await ctx.db.patch(creditId, { 
+        await ctx.db.patch(creditId, {
           status: "withdrawn",
           retirementDate: Date.now(), // Using retirementDate to signify exit from system
         });
       } else {
         // On failure, return credits to 'active' status in the user's wallet
-        await ctx.db.patch(creditId, { 
-          status: "active" 
+        await ctx.db.patch(creditId, {
+          status: "active",
         });
       }
     }
-    
+
     return { success: true, message: `Withdrawal request ${args.status}.` };
   },
 });
